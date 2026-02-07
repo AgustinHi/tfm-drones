@@ -70,3 +70,13 @@ def get_drone(drone_id: int):
             "drone_type": d.drone_type,
             "notes": d.notes,
         }
+
+@app.delete("/drones/{drone_id}")
+def delete_drone(drone_id: int):
+    with Session(engine) as session:
+        d = session.get(Drone, drone_id)
+        if d is None:
+            return {"error": "not found"}
+        session.delete(d)
+        session.commit()
+        return {"deleted": drone_id}
