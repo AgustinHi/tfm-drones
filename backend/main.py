@@ -80,3 +80,29 @@ def delete_drone(drone_id: int):
         session.delete(d)
         session.commit()
         return {"deleted": drone_id}
+
+class DroneUpdate(BaseModel):
+    brand: str
+    model: str
+    drone_type: str
+    notes: str | None = None
+
+@app.put("/drones/{drone_id}")
+def update_drone(drone_id: int, payload: DroneUpdate):
+    with Session(engine) as session:
+        d = session.get(Drone, drone_id)
+        if d is None:
+            return {"error": "not found"}
+        d.brand = payload.brand
+        d.model = payload.model
+        d.drone_type = payload.drone_type
+        d.notes = payload.notes
+        session.commit()
+        session.refresh(d)
+        return {
+            "id": d.id,
+            "brand": d.brand,
+            "model": d.model,
+            "drone_type": d.drone_type,
+            "notes": d.notes,
+        }
