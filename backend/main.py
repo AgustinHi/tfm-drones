@@ -56,3 +56,17 @@ def create_drone(payload: DroneCreate):
             "drone_type": d.drone_type,
             "notes": d.notes,
         }
+
+@app.get("/drones/{drone_id}")
+def get_drone(drone_id: int):
+    with Session(engine) as session:
+        d = session.get(Drone, drone_id)
+        if d is None:
+            return {"error": "not found"}
+        return {
+            "id": d.id,
+            "brand": d.brand,
+            "model": d.model,
+            "drone_type": d.drone_type,
+            "notes": d.notes,
+        }
