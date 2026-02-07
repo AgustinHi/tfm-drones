@@ -145,3 +145,6 @@ backend/__pycache__/
 
 # Node
 node_modules/
+
+backend/.env
+
