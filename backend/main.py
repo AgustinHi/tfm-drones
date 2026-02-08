@@ -1,13 +1,15 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth_routes import get_current_user_email, router as auth_router
 from db import engine
 from models import Drone
 
 app = FastAPI(title="TFM Drones API")
+app.include_router(auth_router)
 
 # CORS: permite que el frontend (Vite) pueda llamar a la API
 app.add_middleware(
@@ -68,7 +70,7 @@ def get_drone(drone_id: int):
 
 
 @app.post("/drones")
-def create_drone(payload: DroneCreate):
+def create_drone(payload: DroneCreate, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = Drone(
             brand=payload.brand,
@@ -83,7 +85,11 @@ def create_drone(payload: DroneCreate):
 
 
 @app.put("/drones/{drone_id}")
-def update_drone(drone_id: int, payload: DroneUpdate):
+def update_drone(
+    drone_id: int,
+    payload: DroneUpdate,
+    user_email: str = Depends(get_current_user_email),
+):
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
@@ -100,7 +106,7 @@ def update_drone(drone_id: int, payload: DroneUpdate):
 
 
 @app.delete("/drones/{drone_id}")
-def delete_drone(drone_id: int):
+def delete_drone(drone_id: int, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:

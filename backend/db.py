@@ -2,6 +2,8 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from models import Base
+import user_models  # noqa: F401
+
 
 load_dotenv()
 
