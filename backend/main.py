@@ -9,9 +9,13 @@ from models import Drone
 
 app = FastAPI(title="TFM Drones API")
 
+# CORS: permite que el frontend (Vite) pueda llamar a la API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
