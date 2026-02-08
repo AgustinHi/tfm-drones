@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 
+const API_BASE = "http://127.0.0.1:8000";
+
 function App() {
   const [drones, setDrones] = useState([]);
 
@@ -9,11 +11,15 @@ function App() {
   const [droneType, setDroneType] = useState("");
   const [notes, setNotes] = useState("");
 
-  useEffect(() => {
+  const loadDrones = () => {
     axios
-      .get("http://127.0.0.1:8000/drones")
+      .get(`${API_BASE}/drones`)
       .then((response) => setDrones(response.data))
       .catch((error) => console.error("Error fetching drones:", error));
+  };
+
+  useEffect(() => {
+    loadDrones();
   }, []);
 
   const handleSubmit = (e) => {
@@ -27,15 +33,22 @@ function App() {
     };
 
     axios
-      .post("http://127.0.0.1:8000/drones", payload)
-      .then((response) => {
-        setDrones((prev) => [...prev, response.data]);
+      .post(`${API_BASE}/drones`, payload)
+      .then(() => {
         setBrand("");
         setModel("");
         setDroneType("");
         setNotes("");
+        loadDrones();
       })
       .catch((error) => console.error("Error creating drone:", error));
+  };
+
+  const handleDelete = (id) => {
+    axios
+      .delete(`${API_BASE}/drones/${id}`)
+      .then(() => loadDrones())
+      .catch((error) => console.error("Error deleting drone:", error));
   };
 
   return (
@@ -43,7 +56,7 @@ function App() {
       <div className="mx-auto max-w-3xl p-6">
         <h1 className="text-3xl font-bold tracking-tight">Drones</h1>
         <p className="mt-1 text-sm text-gray-600">
-          MVP: listado y alta de drones
+          MVP: listado, alta y borrado
         </p>
 
         <div className="mt-6 rounded-xl border bg-white p-4 shadow-sm">
@@ -115,7 +128,7 @@ function App() {
             <ul className="mt-4 divide-y">
               {drones.map((drone) => (
                 <li key={drone.id} className="py-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="font-medium">
                         {drone.brand} — {drone.model}
@@ -125,7 +138,17 @@ function App() {
                         {drone.notes ? ` · ${drone.notes}` : ""}
                       </div>
                     </div>
-                    <div className="text-sm text-gray-500">#{drone.id}</div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm text-gray-500">#{drone.id}</div>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(drone.id)}
+                        className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
