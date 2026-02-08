@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api";
 import { clearToken, isLoggedIn, setToken } from "../auth";
-import { Link } from "react-router-dom";
+import Button from "../ui/Button";
+import Card from "../ui/Card";
+import Input from "../ui/Input";
 
 export default function Manage() {
   const [drones, setDrones] = useState([]);
@@ -147,8 +150,8 @@ export default function Manage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-3xl p-6">
-        <div className="flex items-start justify-between gap-4">
+      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestión</h1>
             <p className="mt-1 text-sm text-gray-600">
@@ -156,223 +159,141 @@ export default function Manage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              to="/"
-              className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-            >
-              Volver
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/">
+              <Button variant="outline">Volver</Button>
             </Link>
-
             {loggedIn && (
-              <button
-                type="button"
-                onClick={logout}
-                className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-              >
+              <Button variant="outline" onClick={logout}>
                 Log out
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {!loggedIn && (
-          <div className="mt-6 rounded-xl border bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setAuthMode("login")}
-                className={`rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-gray-50 ${
-                  authMode === "login" ? "bg-gray-100" : ""
-                }`}
-              >
-                Login
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode("register")}
-                className={`rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-gray-50 ${
-                  authMode === "register" ? "bg-gray-100" : ""
-                }`}
-              >
-                Register
-              </button>
-            </div>
+          <div className="mt-6">
+            <Card title="Acceso">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant={authMode === "login" ? "default" : "outline"}
+                  onClick={() => setAuthMode("login")}
+                >
+                  Login
+                </Button>
+                <Button
+                  variant={authMode === "register" ? "default" : "outline"}
+                  onClick={() => setAuthMode("register")}
+                >
+                  Register
+                </Button>
+              </div>
 
-            <form onSubmit={handleAuthSubmit} className="mt-4 grid gap-3">
-              <div className="grid gap-1">
-                <label className="text-sm font-medium">Email</label>
-                <input
-                  className="rounded-lg border px-3 py-2 outline-none focus:ring"
+              <form onSubmit={handleAuthSubmit} className="mt-4 grid gap-3">
+                <Input
+                  label="Email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="test@example.com"
                   required
                 />
-              </div>
-
-              <div className="grid gap-1">
-                <label className="text-sm font-medium">Password</label>
-                <input
-                  className="rounded-lg border px-3 py-2 outline-none focus:ring"
+                <Input
+                  label="Password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="123456"
                   required
                 />
-              </div>
-
-              <button
-                type="submit"
-                className="mt-2 inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                {authMode === "login" ? "Login" : "Register"}
-              </button>
-            </form>
+                <Button type="submit">
+                  {authMode === "login" ? "Login" : "Register"}
+                </Button>
+              </form>
+            </Card>
           </div>
         )}
 
         {loggedIn && (
           <div className="mt-6 grid gap-6">
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Añadir drone</h2>
-
-              <form onSubmit={handleCreate} className="mt-4 grid gap-3">
-                <div className="grid gap-1">
-                  <label className="text-sm font-medium">Brand</label>
-                  <input
-                    className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                    type="text"
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-1">
-                  <label className="text-sm font-medium">Model</label>
-                  <input
-                    className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                    type="text"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-1">
-                  <label className="text-sm font-medium">Drone type</label>
-                  <input
-                    className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                    type="text"
-                    value={droneType}
-                    onChange={(e) => setDroneType(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="grid gap-1">
-                  <label className="text-sm font-medium">Notes</label>
-                  <input
-                    className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                    type="text"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="mt-2 inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-                >
-                  Add Drone
-                </button>
+            <Card title="Añadir drone">
+              <form onSubmit={handleCreate} className="grid gap-3">
+                <Input
+                  label="Brand"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Model"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Drone type"
+                  value={droneType}
+                  onChange={(e) => setDroneType(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+                <Button type="submit">Add Drone</Button>
               </form>
-            </div>
+            </Card>
 
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Editar drone</h2>
-
+            <Card title="Editar drone">
               {editingId == null ? (
-                <p className="mt-3 text-sm text-gray-600">
+                <p className="text-sm text-gray-600">
                   Pulsa “Edit” en un drone del listado.
                 </p>
               ) : (
-                <form onSubmit={handleUpdate} className="mt-4 grid gap-3">
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium">Brand</label>
-                    <input
-                      className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                      type="text"
-                      value={editBrand}
-                      onChange={(e) => setEditBrand(e.target.value)}
-                      required
-                    />
-                  </div>
+                <form onSubmit={handleUpdate} className="grid gap-3">
+                  <Input
+                    label="Brand"
+                    value={editBrand}
+                    onChange={(e) => setEditBrand(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Model"
+                    value={editModel}
+                    onChange={(e) => setEditModel(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Drone type"
+                    value={editDroneType}
+                    onChange={(e) => setEditDroneType(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Notes"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                  />
 
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium">Model</label>
-                    <input
-                      className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                      type="text"
-                      value={editModel}
-                      onChange={(e) => setEditModel(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium">Drone type</label>
-                    <input
-                      className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                      type="text"
-                      value={editDroneType}
-                      onChange={(e) => setEditDroneType(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium">Notes</label>
-                    <input
-                      className="rounded-lg border px-3 py-2 outline-none focus:ring"
-                      type="text"
-                      value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="submit"
-                      className="inline-flex items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cancelEdit}
-                      className="inline-flex items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-gray-50"
-                    >
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit">Save</Button>
+                    <Button variant="outline" onClick={cancelEdit}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
-            </div>
+            </Card>
 
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <h2 className="text-lg font-semibold">Listado (con acciones)</h2>
-
+            <Card title="Listado (con acciones)">
               {sortedDrones.length === 0 ? (
-                <p className="mt-3 text-sm text-gray-600">No hay drones todavía.</p>
+                <p className="text-sm text-gray-600">No hay drones todavía.</p>
               ) : (
-                <ul className="mt-4 divide-y">
+                <ul className="divide-y">
                   {sortedDrones.map((drone) => (
                     <li key={drone.id} className="py-3">
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="font-medium">
                             {drone.brand} — {drone.model}
@@ -383,29 +304,21 @@ export default function Manage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <div className="text-sm text-gray-500">#{drone.id}</div>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(drone)}
-                            className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
-                          >
+                          <Button variant="outline" onClick={() => startEdit(drone)}>
                             Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(drone.id)}
-                            className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
-                          >
+                          </Button>
+                          <Button variant="outline" onClick={() => handleDelete(drone.id)}>
                             Delete
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
+            </Card>
           </div>
         )}
       </div>
