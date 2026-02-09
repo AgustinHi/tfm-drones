@@ -46,13 +46,13 @@ export default function Manage() {
     loadDrones();
   }, []);
 
-  // ✅ logout global (401) -> te manda a /login y allí verás el mensaje
+  // ✅ logout global (401) -> /login con motivo "expired"
   useEffect(() => {
     const onLogout = () => {
       setEditingId(null);
       setBusy(false);
       resetFeedback();
-      navigate("/login", { replace: true });
+      navigate("/login", { replace: true, state: { reason: "expired", from: "/manage" } });
     };
 
     window.addEventListener("auth:logout", onLogout);

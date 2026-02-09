@@ -12,7 +12,9 @@ const isValidPassword = (v) => v.trim().length >= 6;
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+
   const from = location.state?.from || "/manage";
+  const reason = location.state?.reason || null;
 
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -27,7 +29,15 @@ export default function Login() {
     setAuthSuccess("");
   };
 
-  // ✅ mensaje global (401) cuando te echa a login
+  // ✅ Si venimos expulsados por 401, mostramos el motivo
+  useEffect(() => {
+    if (reason === "expired") {
+      setAuthSuccess("");
+      setAuthError("Sesión caducada. Vuelve a iniciar sesión.");
+    }
+  }, [reason]);
+
+  // ✅ Backup: si por lo que sea se dispara el evento estando aquí
   useEffect(() => {
     const onLogout = () => {
       setBusy(false);
