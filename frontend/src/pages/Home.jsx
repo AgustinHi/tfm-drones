@@ -36,7 +36,9 @@ export default function Home() {
 
     return base.filter((d) => {
       const idText = String(d.id ?? "");
-      const text = `${idText} ${d.brand ?? ""} ${d.model ?? ""} ${d.drone_type ?? ""} ${d.notes ?? ""}`.toLowerCase();
+      const text = `${idText} ${d.brand ?? ""} ${d.model ?? ""} ${d.drone_type ?? ""} ${
+        d.notes ?? ""
+      }`.toLowerCase();
       return text.includes(q);
     });
   }, [drones, query]);
@@ -63,7 +65,7 @@ export default function Home() {
                 </Button>
               </>
             ) : (
-              <Link to="/manage">
+              <Link to="/login">
                 <Button variant="outline">Login / Register</Button>
               </Link>
             )}

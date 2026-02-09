@@ -1,24 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
-import { clearToken, isLoggedIn, setToken } from "../auth";
+import { clearToken } from "../auth";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 
-const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-const isValidPassword = (v) => v.trim().length >= 6;
-
 export default function Manage() {
+  const navigate = useNavigate();
+
   const [drones, setDrones] = useState([]);
 
-  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
-  const [authMode, setAuthMode] = useState("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [authError, setAuthError] = useState("");
-  const [authSuccess, setAuthSuccess] = useState("");
   const [crudError, setCrudError] = useState("");
   const [crudSuccess, setCrudSuccess] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,8 +31,6 @@ export default function Manage() {
   }, [drones]);
 
   const resetFeedback = () => {
-    setAuthError("");
-    setAuthSuccess("");
     setCrudError("");
     setCrudSuccess("");
   };
@@ -56,63 +46,24 @@ export default function Manage() {
     loadDrones();
   }, []);
 
-  // ✅ logout global (401)
+  // ✅ logout global (401) -> te manda a /login y allí verás el mensaje
   useEffect(() => {
     const onLogout = () => {
-      setLoggedIn(false);
       setEditingId(null);
       setBusy(false);
-      setCrudSuccess("");
-      setCrudError("");
-      setAuthSuccess("");
-      setAuthError("Sesión caducada. Vuelve a iniciar sesión.");
+      resetFeedback();
+      navigate("/login", { replace: true });
     };
 
     window.addEventListener("auth:logout", onLogout);
     return () => window.removeEventListener("auth:logout", onLogout);
-  }, []);
+  }, [navigate]);
 
   const logout = () => {
     clearToken();
-    setLoggedIn(false);
     setEditingId(null);
     resetFeedback();
-  };
-
-  const handleAuthSubmit = async (e) => {
-    e.preventDefault();
-    resetFeedback();
-
-    const eVal = email.trim();
-    const pVal = password.trim();
-
-    if (!isValidEmail(eVal)) return setAuthError("Email no válido.");
-    if (!isValidPassword(pVal))
-      return setAuthError("La contraseña debe tener al menos 6 caracteres.");
-
-    try {
-      setBusy(true);
-
-      if (authMode === "register") {
-        const res = await api.post("/auth/register", { email: eVal, password: pVal });
-        if (res.data?.error) return setAuthError(res.data.error);
-        setAuthSuccess("Usuario creado. Ahora inicia sesión.");
-        setAuthMode("login");
-        return;
-      }
-
-      const res = await api.post("/auth/login", { email: eVal, password: pVal });
-      if (res.data?.error) return setAuthError(res.data.error);
-
-      setToken(res.data.access_token);
-      setLoggedIn(true);
-      setAuthSuccess("Sesión iniciada.");
-    } catch (err) {
-      setAuthError("Error de red o servidor.");
-      console.error(err);
-    } finally {
-      setBusy(false);
-    }
+    navigate("/login", { replace: true });
   };
 
   const handleCreate = async (e) => {
@@ -221,29 +172,21 @@ export default function Manage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestión</h1>
-            <p className="mt-1 text-sm text-gray-600">Login/register + CRUD (solo logueados)</p>
+            <p className="mt-1 text-sm text-gray-600">CRUD (solo logueados)</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link to="/">
               <Button variant="outline">Volver</Button>
             </Link>
-            {loggedIn && (
-              <Button variant="outline" onClick={logout}>
-                Log out
-              </Button>
-            )}
+            <Button variant="outline" onClick={logout}>
+              Log out
+            </Button>
           </div>
         </div>
 
-        {(authError || authSuccess || crudError || crudSuccess) && (
+        {(crudError || crudSuccess) && (
           <div className="mt-6 grid gap-2">
-            {authError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">{authError}</div>
-            ) : null}
-            {authSuccess ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">{authSuccess}</div>
-            ) : null}
             {crudError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">{crudError}</div>
             ) : null}
@@ -253,123 +196,80 @@ export default function Manage() {
           </div>
         )}
 
-        {!loggedIn && (
-          <div className="mt-6">
-            <Card title="Acceso">
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant={authMode === "login" ? "default" : "outline"}
-                  onClick={() => {
-                    resetFeedback();
-                    setAuthMode("login");
-                  }}
-                >
-                  Login
-                </Button>
-                <Button
-                  variant={authMode === "register" ? "default" : "outline"}
-                  onClick={() => {
-                    resetFeedback();
-                    setAuthMode("register");
-                  }}
-                >
-                  Register
-                </Button>
-              </div>
+        <div className="mt-6 grid gap-6">
+          <Card title="Añadir drone">
+            <form onSubmit={handleCreate} className="grid gap-3">
+              <Input label="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} required />
+              <Input label="Model" value={model} onChange={(e) => setModel(e.target.value)} required />
+              <Input label="Drone type" value={droneType} onChange={(e) => setDroneType(e.target.value)} required />
+              <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Button type="submit" disabled={busy}>
+                {busy ? "Creando..." : "Add Drone"}
+              </Button>
+            </form>
+          </Card>
 
-              <form onSubmit={handleAuthSubmit} className="mt-4 grid gap-3">
-                <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Card title="Editar drone">
+            {editingId == null ? (
+              <p className="text-sm text-gray-600">Pulsa “Edit” en un drone del listado.</p>
+            ) : (
+              <form onSubmit={handleUpdate} className="grid gap-3">
+                <Input label="Brand" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} required />
+                <Input label="Model" value={editModel} onChange={(e) => setEditModel(e.target.value)} required />
                 <Input
-                  label="Password (mín. 6)"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  label="Drone type"
+                  value={editDroneType}
+                  onChange={(e) => setEditDroneType(e.target.value)}
                   required
                 />
-                <Button type="submit" disabled={busy}>
-                  {busy ? "Procesando..." : authMode === "login" ? "Login" : "Register"}
-                </Button>
+                <Input label="Notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={busy}>
+                    {busy ? "Guardando..." : "Save"}
+                  </Button>
+                  <Button variant="outline" onClick={cancelEdit} disabled={busy}>
+                    Cancel
+                  </Button>
+                </div>
               </form>
-            </Card>
-          </div>
-        )}
+            )}
+          </Card>
 
-        {loggedIn && (
-          <div className="mt-6 grid gap-6">
-            <Card title="Añadir drone">
-              <form onSubmit={handleCreate} className="grid gap-3">
-                <Input label="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} required />
-                <Input label="Model" value={model} onChange={(e) => setModel(e.target.value)} required />
-                <Input label="Drone type" value={droneType} onChange={(e) => setDroneType(e.target.value)} required />
-                <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-                <Button type="submit" disabled={busy}>
-                  {busy ? "Creando..." : "Add Drone"}
-                </Button>
-              </form>
-            </Card>
-
-            <Card title="Editar drone">
-              {editingId == null ? (
-                <p className="text-sm text-gray-600">Pulsa “Edit” en un drone del listado.</p>
-              ) : (
-                <form onSubmit={handleUpdate} className="grid gap-3">
-                  <Input label="Brand" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} required />
-                  <Input label="Model" value={editModel} onChange={(e) => setEditModel(e.target.value)} required />
-                  <Input
-                    label="Drone type"
-                    value={editDroneType}
-                    onChange={(e) => setEditDroneType(e.target.value)}
-                    required
-                  />
-                  <Input label="Notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={busy}>
-                      {busy ? "Guardando..." : "Save"}
-                    </Button>
-                    <Button variant="outline" onClick={cancelEdit} disabled={busy}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </Card>
-
-            <Card title="Listado (con acciones)">
-              {sortedDrones.length === 0 ? (
-                <p className="text-sm text-gray-600">No hay drones todavía.</p>
-              ) : (
-                <ul className="divide-y">
-                  {sortedDrones.map((drone) => (
-                    <li key={drone.id} className="py-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <div className="font-medium">
-                            {drone.brand} — {drone.model}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {drone.drone_type}
-                            {drone.notes ? ` · ${drone.notes}` : ""}
-                          </div>
+          <Card title="Listado (con acciones)">
+            {sortedDrones.length === 0 ? (
+              <p className="text-sm text-gray-600">No hay drones todavía.</p>
+            ) : (
+              <ul className="divide-y">
+                {sortedDrones.map((drone) => (
+                  <li key={drone.id} className="py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="font-medium">
+                          {drone.brand} — {drone.model}
                         </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-sm text-gray-500">#{drone.id}</div>
-                          <Button variant="outline" onClick={() => startEdit(drone)} disabled={busy}>
-                            Edit
-                          </Button>
-                          <Button variant="outline" onClick={() => handleDelete(drone.id)} disabled={busy}>
-                            Delete
-                          </Button>
+                        <div className="text-sm text-gray-600">
+                          {drone.drone_type}
+                          {drone.notes ? ` · ${drone.notes}` : ""}
                         </div>
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </div>
-        )}
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm text-gray-500">#{drone.id}</div>
+                        <Button variant="outline" onClick={() => startEdit(drone)} disabled={busy}>
+                          Edit
+                        </Button>
+                        <Button variant="outline" onClick={() => handleDelete(drone.id)} disabled={busy}>
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );
