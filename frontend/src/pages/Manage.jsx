@@ -6,6 +6,9 @@ import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 
+const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+const isValidPassword = (v) => v.trim().length >= 6;
+
 export default function Manage() {
   const [drones, setDrones] = useState([]);
 
@@ -14,6 +17,13 @@ export default function Manage() {
   const [authMode, setAuthMode] = useState("login"); // login | register
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  // Feedback
+  const [authError, setAuthError] = useState("");
+  const [authSuccess, setAuthSuccess] = useState("");
+  const [crudError, setCrudError] = useState("");
+  const [crudSuccess, setCrudSuccess] = useState("");
+  const [busy, setBusy] = useState(false);
 
   // Create
   const [brand, setBrand] = useState("");
@@ -43,66 +53,106 @@ export default function Manage() {
     loadDrones();
   }, []);
 
+  const resetFeedback = () => {
+    setAuthError("");
+    setAuthSuccess("");
+    setCrudError("");
+    setCrudSuccess("");
+  };
+
   const logout = () => {
     clearToken();
     setLoggedIn(false);
     setEditingId(null);
+    resetFeedback();
   };
 
-  const handleAuthSubmit = (e) => {
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
+    resetFeedback();
 
-    if (authMode === "register") {
-      api
-        .post("/auth/register", { email, password })
-        .then((res) => {
-          if (res.data?.error) {
-            alert(res.data.error);
-            return;
-          }
-          alert("Usuario creado. Ahora inicia sesión.");
-          setAuthMode("login");
-        })
-        .catch((err) => console.error("Error register:", err));
+    const eVal = email.trim();
+    const pVal = password.trim();
+
+    if (!isValidEmail(eVal)) {
+      setAuthError("Email no válido.");
+      return;
+    }
+    if (!isValidPassword(pVal)) {
+      setAuthError("La contraseña debe tener al menos 6 caracteres.");
       return;
     }
 
-    api
-      .post("/auth/login", { email, password })
-      .then((res) => {
+    try {
+      setBusy(true);
+
+      if (authMode === "register") {
+        const res = await api.post("/auth/register", { email: eVal, password: pVal });
         if (res.data?.error) {
-          alert(res.data.error);
+          setAuthError(res.data.error);
           return;
         }
-        setToken(res.data.access_token);
-        setLoggedIn(true);
-      })
-      .catch((err) => console.error("Error login:", err));
+        setAuthSuccess("Usuario creado. Ahora inicia sesión.");
+        setAuthMode("login");
+        return;
+      }
+
+      const res = await api.post("/auth/login", { email: eVal, password: pVal });
+      if (res.data?.error) {
+        setAuthError(res.data.error);
+        return;
+      }
+
+      setToken(res.data.access_token);
+      setLoggedIn(true);
+      setAuthSuccess("Sesión iniciada.");
+    } catch (err) {
+      setAuthError("Error de red o servidor.");
+      console.error(err);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
+    resetFeedback();
 
     const payload = {
-      brand,
-      model,
-      drone_type: droneType,
-      notes,
+      brand: brand.trim(),
+      model: model.trim(),
+      drone_type: droneType.trim(),
+      notes: notes.trim() || null,
     };
 
-    api
-      .post("/drones", payload)
-      .then(() => {
-        setBrand("");
-        setModel("");
-        setDroneType("");
-        setNotes("");
-        loadDrones();
-      })
-      .catch((err) => console.error("Error creating drone:", err));
+    if (!payload.brand || !payload.model || !payload.drone_type) {
+      setCrudError("Brand, Model y Drone type son obligatorios.");
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const res = await api.post("/drones", payload);
+      if (res.data?.error) {
+        setCrudError(res.data.error);
+        return;
+      }
+      setBrand("");
+      setModel("");
+      setDroneType("");
+      setNotes("");
+      setCrudSuccess("Drone creado.");
+      loadDrones();
+    } catch (err) {
+      setCrudError("No se pudo crear (¿sesión caducada?).");
+      console.error(err);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const startEdit = (drone) => {
+    resetFeedback();
     setEditingId(drone.id);
     setEditBrand(drone.brand ?? "");
     setEditModel(drone.model ?? "");
@@ -118,34 +168,59 @@ export default function Manage() {
     setEditNotes("");
   };
 
-  const handleUpdate = (e) => {
+  const handleUpdate = async (e) => {
     e.preventDefault();
+    resetFeedback();
     if (editingId == null) return;
 
     const payload = {
-      brand: editBrand,
-      model: editModel,
-      drone_type: editDroneType,
-      notes: editNotes,
+      brand: editBrand.trim(),
+      model: editModel.trim(),
+      drone_type: editDroneType.trim(),
+      notes: editNotes.trim() || null,
     };
 
-    api
-      .put(`/drones/${editingId}`, payload)
-      .then(() => {
-        cancelEdit();
-        loadDrones();
-      })
-      .catch((err) => console.error("Error updating drone:", err));
+    if (!payload.brand || !payload.model || !payload.drone_type) {
+      setCrudError("Brand, Model y Drone type son obligatorios.");
+      return;
+    }
+
+    try {
+      setBusy(true);
+      const res = await api.put(`/drones/${editingId}`, payload);
+      if (res.data?.error) {
+        setCrudError(res.data.error);
+        return;
+      }
+      setCrudSuccess("Drone actualizado.");
+      cancelEdit();
+      loadDrones();
+    } catch (err) {
+      setCrudError("No se pudo actualizar (¿sesión caducada?).");
+      console.error(err);
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleDelete = (id) => {
-    api
-      .delete(`/drones/${id}`)
-      .then(() => {
-        if (editingId === id) cancelEdit();
-        loadDrones();
-      })
-      .catch((err) => console.error("Error deleting drone:", err));
+  const handleDelete = async (id) => {
+    resetFeedback();
+    try {
+      setBusy(true);
+      const res = await api.delete(`/drones/${id}`);
+      if (res.data?.error) {
+        setCrudError(res.data.error);
+        return;
+      }
+      setCrudSuccess("Drone borrado.");
+      if (editingId === id) cancelEdit();
+      loadDrones();
+    } catch (err) {
+      setCrudError("No se pudo borrar (¿sesión caducada?).");
+      console.error(err);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -155,7 +230,7 @@ export default function Manage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestión</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Página secundaria: login/register + CRUD de drones (solo logueados)
+              Login/register + CRUD de drones (solo logueados)
             </p>
           </div>
 
@@ -171,19 +246,51 @@ export default function Manage() {
           </div>
         </div>
 
+        {/* Mensajes globales */}
+        {(authError || authSuccess || crudError || crudSuccess) && (
+          <div className="mt-6 grid gap-2">
+            {authError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">
+                {authError}
+              </div>
+            ) : null}
+            {authSuccess ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">
+                {authSuccess}
+              </div>
+            ) : null}
+            {crudError ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">
+                {crudError}
+              </div>
+            ) : null}
+            {crudSuccess ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">
+                {crudSuccess}
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {!loggedIn && (
           <div className="mt-6">
             <Card title="Acceso">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant={authMode === "login" ? "default" : "outline"}
-                  onClick={() => setAuthMode("login")}
+                  onClick={() => {
+                    resetFeedback();
+                    setAuthMode("login");
+                  }}
                 >
                   Login
                 </Button>
                 <Button
                   variant={authMode === "register" ? "default" : "outline"}
-                  onClick={() => setAuthMode("register")}
+                  onClick={() => {
+                    resetFeedback();
+                    setAuthMode("register");
+                  }}
                 >
                   Register
                 </Button>
@@ -199,15 +306,15 @@ export default function Manage() {
                   required
                 />
                 <Input
-                  label="Password"
+                  label="Password (mín. 6)"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="123456"
                   required
                 />
-                <Button type="submit">
-                  {authMode === "login" ? "Login" : "Register"}
+                <Button type="submit" disabled={busy}>
+                  {busy ? "Procesando..." : authMode === "login" ? "Login" : "Register"}
                 </Button>
               </form>
             </Card>
@@ -218,67 +325,41 @@ export default function Manage() {
           <div className="mt-6 grid gap-6">
             <Card title="Añadir drone">
               <form onSubmit={handleCreate} className="grid gap-3">
-                <Input
-                  label="Brand"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  required
-                />
+                <Input label="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} required />
+                <Input label="Model" value={model} onChange={(e) => setModel(e.target.value)} required />
                 <Input
                   label="Drone type"
                   value={droneType}
                   onChange={(e) => setDroneType(e.target.value)}
                   required
                 />
-                <Input
-                  label="Notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-                <Button type="submit">Add Drone</Button>
+                <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                <Button type="submit" disabled={busy}>
+                  {busy ? "Creando..." : "Add Drone"}
+                </Button>
               </form>
             </Card>
 
             <Card title="Editar drone">
               {editingId == null ? (
-                <p className="text-sm text-gray-600">
-                  Pulsa “Edit” en un drone del listado.
-                </p>
+                <p className="text-sm text-gray-600">Pulsa “Edit” en un drone del listado.</p>
               ) : (
                 <form onSubmit={handleUpdate} className="grid gap-3">
-                  <Input
-                    label="Brand"
-                    value={editBrand}
-                    onChange={(e) => setEditBrand(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Model"
-                    value={editModel}
-                    onChange={(e) => setEditModel(e.target.value)}
-                    required
-                  />
+                  <Input label="Brand" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} required />
+                  <Input label="Model" value={editModel} onChange={(e) => setEditModel(e.target.value)} required />
                   <Input
                     label="Drone type"
                     value={editDroneType}
                     onChange={(e) => setEditDroneType(e.target.value)}
                     required
                   />
-                  <Input
-                    label="Notes"
-                    value={editNotes}
-                    onChange={(e) => setEditNotes(e.target.value)}
-                  />
+                  <Input label="Notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
 
                   <div className="flex flex-wrap gap-2">
-                    <Button type="submit">Save</Button>
-                    <Button variant="outline" onClick={cancelEdit}>
+                    <Button type="submit" disabled={busy}>
+                      {busy ? "Guardando..." : "Save"}
+                    </Button>
+                    <Button variant="outline" onClick={cancelEdit} disabled={busy}>
                       Cancel
                     </Button>
                   </div>
@@ -306,10 +387,10 @@ export default function Manage() {
 
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="text-sm text-gray-500">#{drone.id}</div>
-                          <Button variant="outline" onClick={() => startEdit(drone)}>
+                          <Button variant="outline" onClick={() => startEdit(drone)} disabled={busy}>
                             Edit
                           </Button>
-                          <Button variant="outline" onClick={() => handleDelete(drone.id)}>
+                          <Button variant="outline" onClick={() => handleDelete(drone.id)} disabled={busy}>
                             Delete
                           </Button>
                         </div>
