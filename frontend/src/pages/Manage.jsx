@@ -1,27 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
+
+import api, { getToken } from "../api";
 
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-function getAuthToken() {
-  return localStorage.getItem("tfm_token") || "";
-}
-
-function buildAxiosErrorMessage(err) {
-  if (!err) return "Error desconocido";
-
-  if (!err.response) {
+function buildErrorMessage(err) {
+  // Sin response => red / CORS / backend caído / timeout
+  if (!err?.response) {
     return "Error de red: no se pudo contactar con el servidor.";
   }
 
   const status = err.response.status;
 
+  // 401 lo gestiona el interceptor (logout + redirect),
+  // pero dejamos mensaje por si el flujo no recarga por alguna razón.
   if (status === 401) {
-    return "No autorizado (401). Tu sesión no es válida o ha caducado. Inicia sesión de nuevo.";
+    return "No autorizado (401). Tu sesión no es válida o ha caducado.";
   }
 
   const detail = err.response?.data?.detail;
@@ -41,16 +37,12 @@ export default function Manage() {
 
   const [msg, setMsg] = useState({ type: "", text: "" });
 
-  const token = useMemo(() => getAuthToken(), []);
-
   function setError(text) {
     setMsg({ type: "error", text });
   }
-
   function setOk(text) {
     setMsg({ type: "ok", text });
   }
-
   function clearMsg() {
     setMsg({ type: "", text: "" });
   }
@@ -66,10 +58,10 @@ export default function Manage() {
     setLoading(true);
     clearMsg();
     try {
-      const res = await axios.get(`${API_BASE}/drones`);
+      const res = await api.get("/drones");
       setDrones(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError(buildAxiosErrorMessage(err));
+      setError(buildErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -85,8 +77,9 @@ export default function Manage() {
       return;
     }
 
-    if (!token) {
-      setError("No hay token guardado en localStorage (tfm_token). Inicia sesión primero.");
+    // Si no hay token, no intentamos llamar: mensaje claro.
+    if (!getToken()) {
+      setError("No hay sesión activa. Inicia sesión para crear drones.");
       return;
     }
 
@@ -99,20 +92,17 @@ export default function Manage() {
 
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/drones`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
+      const res = await api.post("/drones", payload);
       setDrones((prev) => [res.data, ...prev]);
+
       setBrand("");
       setModel("");
       setDroneType("");
       setNotes("");
+
       setOk("Drone creado correctamente.");
     } catch (err) {
-      setError(buildAxiosErrorMessage(err));
+      setError(buildErrorMessage(err));
     } finally {
       setLoading(false);
     }

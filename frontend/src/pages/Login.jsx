@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import api from "../api";
+import api, { SESSION_MSG_KEY } from "../api";
 import { setToken } from "../auth";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
@@ -29,7 +29,17 @@ export default function Login() {
     setAuthSuccess("");
   };
 
-  // ✅ Si venimos expulsados por 401, mostramos el motivo
+  // ✅ 1) Mensaje persistido por el interceptor (401 -> /login)
+  useEffect(() => {
+    const msg = localStorage.getItem(SESSION_MSG_KEY);
+    if (msg) {
+      localStorage.removeItem(SESSION_MSG_KEY);
+      setAuthSuccess("");
+      setAuthError(msg);
+    }
+  }, []);
+
+  // ✅ 2) Si venimos expulsados por state (compatibilidad)
   useEffect(() => {
     if (reason === "expired") {
       setAuthSuccess("");
@@ -37,7 +47,7 @@ export default function Login() {
     }
   }, [reason]);
 
-  // ✅ Backup: si por lo que sea se dispara el evento estando aquí
+  // ✅ 3) Backup: evento (si lo usas en algún punto)
   useEffect(() => {
     const onLogout = () => {
       setBusy(false);

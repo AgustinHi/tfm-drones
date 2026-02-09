@@ -1,15 +1,16 @@
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth_routes import get_current_user_email, router as auth_router
-from db import engine
 from db import engine, create_tables
 from models import Drone
 
 app = FastAPI(title="TFM Drones API")
+
+# Crear tablas al arrancar (idempotente)
 create_tables()
 
 app.include_router(auth_router)
@@ -57,22 +58,25 @@ def health():
 
 
 @app.get("/drones")
-def list_drones():
+def list_drones(user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         drones = session.scalars(select(Drone)).all()
         return [drone_to_dict(d) for d in drones]
 
 
 @app.get("/drones/{drone_id}")
-def get_drone(drone_id: int):
+def get_drone(drone_id: int, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
-            return {"error": "not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Drone not found",
+            )
         return drone_to_dict(d)
 
 
-@app.post("/drones")
+@app.post("/drones", status_code=status.HTTP_201_CREATED)
 def create_drone(payload: DroneCreate, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = Drone(
@@ -96,7 +100,10 @@ def update_drone(
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
-            return {"error": "not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Drone not found",
+            )
 
         d.brand = payload.brand
         d.model = payload.model
@@ -113,7 +120,10 @@ def delete_drone(drone_id: int, user_email: str = Depends(get_current_user_email
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
-            return {"error": "not found"}
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Drone not found",
+            )
 
         session.delete(d)
         session.commit()
