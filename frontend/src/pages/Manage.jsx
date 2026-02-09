@@ -1,276 +1,216 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import api from "../api";
-import { clearToken } from "../auth";
+import axios from "axios";
+
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+function getAuthToken() {
+  return localStorage.getItem("tfm_token") || "";
+}
+
+function buildAxiosErrorMessage(err) {
+  if (!err) return "Error desconocido";
+
+  if (!err.response) {
+    return "Error de red: no se pudo contactar con el servidor.";
+  }
+
+  const status = err.response.status;
+
+  if (status === 401) {
+    return "No autorizado (401). Tu sesión no es válida o ha caducado. Inicia sesión de nuevo.";
+  }
+
+  const detail = err.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) return `${detail} (HTTP ${status})`;
+
+  return `Error HTTP ${status}: ${err.response.statusText || "Error"}`;
+}
+
 export default function Manage() {
-  const navigate = useNavigate();
-
   const [drones, setDrones] = useState([]);
-
-  const [crudError, setCrudError] = useState("");
-  const [crudSuccess, setCrudSuccess] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [droneType, setDroneType] = useState("");
   const [notes, setNotes] = useState("");
 
-  const [editingId, setEditingId] = useState(null);
-  const [editBrand, setEditBrand] = useState("");
-  const [editModel, setEditModel] = useState("");
-  const [editDroneType, setEditDroneType] = useState("");
-  const [editNotes, setEditNotes] = useState("");
+  const [msg, setMsg] = useState({ type: "", text: "" });
 
-  const sortedDrones = useMemo(() => {
-    return [...drones].sort((a, b) => a.id - b.id);
-  }, [drones]);
+  const token = useMemo(() => getAuthToken(), []);
 
-  const resetFeedback = () => {
-    setCrudError("");
-    setCrudSuccess("");
-  };
+  function setError(text) {
+    setMsg({ type: "error", text });
+  }
 
-  const loadDrones = () => {
-    api
-      .get("/drones")
-      .then((res) => setDrones(res.data))
-      .catch((err) => console.error("Error fetching drones:", err));
-  };
+  function setOk(text) {
+    setMsg({ type: "ok", text });
+  }
 
-  useEffect(() => {
-    loadDrones();
-  }, []);
+  function clearMsg() {
+    setMsg({ type: "", text: "" });
+  }
 
-  // ✅ logout global (401) -> /login con motivo "expired"
-  useEffect(() => {
-    const onLogout = () => {
-      setEditingId(null);
-      setBusy(false);
-      resetFeedback();
-      navigate("/login", { replace: true, state: { reason: "expired", from: "/manage" } });
-    };
+  function validateForm() {
+    if (!brand.trim()) return "La marca (brand) es obligatoria.";
+    if (!model.trim()) return "El modelo (model) es obligatorio.";
+    if (!droneType.trim()) return "El tipo (drone_type) es obligatorio.";
+    return "";
+  }
 
-    window.addEventListener("auth:logout", onLogout);
-    return () => window.removeEventListener("auth:logout", onLogout);
-  }, [navigate]);
+  async function fetchDrones() {
+    setLoading(true);
+    clearMsg();
+    try {
+      const res = await axios.get(`${API_BASE}/drones`);
+      setDrones(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      setError(buildAxiosErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
 
-  const logout = () => {
-    clearToken();
-    setEditingId(null);
-    resetFeedback();
-    navigate("/login", { replace: true });
-  };
-
-  const handleCreate = async (e) => {
+  async function createDrone(e) {
     e.preventDefault();
-    resetFeedback();
+    clearMsg();
+
+    const v = validateForm();
+    if (v) {
+      setError(v);
+      return;
+    }
+
+    if (!token) {
+      setError("No hay token guardado en localStorage (tfm_token). Inicia sesión primero.");
+      return;
+    }
 
     const payload = {
       brand: brand.trim(),
       model: model.trim(),
       drone_type: droneType.trim(),
-      notes: notes.trim() || null,
+      notes: notes.trim() ? notes.trim() : null,
     };
 
-    if (!payload.brand || !payload.model || !payload.drone_type) {
-      setCrudError("Brand, Model y Drone type son obligatorios.");
-      return;
-    }
-
+    setLoading(true);
     try {
-      setBusy(true);
-      await api.post("/drones", payload);
+      const res = await axios.post(`${API_BASE}/drones`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setDrones((prev) => [res.data, ...prev]);
       setBrand("");
       setModel("");
       setDroneType("");
       setNotes("");
-      setCrudSuccess("Drone creado.");
-      loadDrones();
+      setOk("Drone creado correctamente.");
     } catch (err) {
-      if (!err?.response) setCrudError("Backend no disponible (¿backend apagado?).");
-      else if (err.response.status !== 401) setCrudError("No se pudo crear.");
-      console.error(err);
+      setError(buildAxiosErrorMessage(err));
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  };
+  }
 
-  const startEdit = (drone) => {
-    resetFeedback();
-    setEditingId(drone.id);
-    setEditBrand(drone.brand ?? "");
-    setEditModel(drone.model ?? "");
-    setEditDroneType(drone.drone_type ?? "");
-    setEditNotes(drone.notes ?? "");
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditBrand("");
-    setEditModel("");
-    setEditDroneType("");
-    setEditNotes("");
-  };
-
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    resetFeedback();
-    if (editingId == null) return;
-
-    const payload = {
-      brand: editBrand.trim(),
-      model: editModel.trim(),
-      drone_type: editDroneType.trim(),
-      notes: editNotes.trim() || null,
-    };
-
-    if (!payload.brand || !payload.model || !payload.drone_type) {
-      setCrudError("Brand, Model y Drone type son obligatorios.");
-      return;
-    }
-
-    try {
-      setBusy(true);
-      await api.put(`/drones/${editingId}`, payload);
-      setCrudSuccess("Drone actualizado.");
-      cancelEdit();
-      loadDrones();
-    } catch (err) {
-      if (!err?.response) setCrudError("Backend no disponible (¿backend apagado?).");
-      else if (err.response.status !== 401) setCrudError("No se pudo actualizar.");
-      console.error(err);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleDelete = async (id) => {
-    resetFeedback();
-    try {
-      setBusy(true);
-      await api.delete(`/drones/${id}`);
-      setCrudSuccess("Drone borrado.");
-      if (editingId === id) cancelEdit();
-      loadDrones();
-    } catch (err) {
-      if (!err?.response) setCrudError("Backend no disponible (¿backend apagado?).");
-      else if (err.response.status !== 401) setCrudError("No se pudo borrar.");
-      console.error(err);
-    } finally {
-      setBusy(false);
-    }
-  };
+  useEffect(() => {
+    fetchDrones();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Gestión</h1>
-            <p className="mt-1 text-sm text-gray-600">CRUD (solo logueados)</p>
-          </div>
+    <div style={{ maxWidth: 900, margin: "0 auto", padding: 16 }}>
+      <h1 style={{ fontSize: 24, marginBottom: 12 }}>Manage Drones</h1>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Link to="/">
-              <Button variant="outline">Volver</Button>
-            </Link>
-            <Button variant="outline" onClick={logout}>
-              Log out
+      {msg.text ? (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: 12,
+            borderRadius: 8,
+            border: "1px solid #ddd",
+          }}
+        >
+          <strong>{msg.type === "error" ? "Error: " : "OK: "}</strong>
+          {msg.text}
+        </div>
+      ) : null}
+
+      <Card style={{ padding: 16, marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, marginBottom: 12 }}>Crear drone</h2>
+
+        <form onSubmit={createDrone} style={{ display: "grid", gap: 10 }}>
+          <Input
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            placeholder="Brand (marca)"
+            autoComplete="off"
+          />
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="Model (modelo)"
+            autoComplete="off"
+          />
+          <Input
+            value={droneType}
+            onChange={(e) => setDroneType(e.target.value)}
+            placeholder="Drone type (tipo)"
+            autoComplete="off"
+          />
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (opcional)"
+            autoComplete="off"
+          />
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Creando..." : "Crear"}
+            </Button>
+            <Button type="button" variant="outline" onClick={fetchDrones} disabled={loading}>
+              {loading ? "Cargando..." : "Recargar"}
             </Button>
           </div>
-        </div>
+        </form>
+      </Card>
 
-        {(crudError || crudSuccess) && (
-          <div className="mt-6 grid gap-2">
-            {crudError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">{crudError}</div>
-            ) : null}
-            {crudSuccess ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">{crudSuccess}</div>
-            ) : null}
+      <Card style={{ padding: 16 }}>
+        <h2 style={{ fontSize: 18, marginBottom: 12 }}>
+          Drones {loading ? "(cargando...)" : `(${drones.length})`}
+        </h2>
+
+        {drones.length === 0 ? (
+          <p>No hay drones.</p>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {drones.map((d) => (
+              <div
+                key={d.id}
+                style={{
+                  padding: 12,
+                  border: "1px solid #eee",
+                  borderRadius: 8,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <strong>
+                    #{d.id} — {d.brand} {d.model}
+                  </strong>
+                  <span>{d.drone_type}</span>
+                </div>
+                {d.notes ? <div style={{ marginTop: 6 }}>{d.notes}</div> : null}
+              </div>
+            ))}
           </div>
         )}
-
-        <div className="mt-6 grid gap-6">
-          <Card title="Añadir drone">
-            <form onSubmit={handleCreate} className="grid gap-3">
-              <Input label="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} required />
-              <Input label="Model" value={model} onChange={(e) => setModel(e.target.value)} required />
-              <Input label="Drone type" value={droneType} onChange={(e) => setDroneType(e.target.value)} required />
-              <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-              <Button type="submit" disabled={busy}>
-                {busy ? "Creando..." : "Add Drone"}
-              </Button>
-            </form>
-          </Card>
-
-          <Card title="Editar drone">
-            {editingId == null ? (
-              <p className="text-sm text-gray-600">Pulsa “Edit” en un drone del listado.</p>
-            ) : (
-              <form onSubmit={handleUpdate} className="grid gap-3">
-                <Input label="Brand" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} required />
-                <Input label="Model" value={editModel} onChange={(e) => setEditModel(e.target.value)} required />
-                <Input
-                  label="Drone type"
-                  value={editDroneType}
-                  onChange={(e) => setEditDroneType(e.target.value)}
-                  required
-                />
-                <Input label="Notes" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
-
-                <div className="flex flex-wrap gap-2">
-                  <Button type="submit" disabled={busy}>
-                    {busy ? "Guardando..." : "Save"}
-                  </Button>
-                  <Button variant="outline" onClick={cancelEdit} disabled={busy}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            )}
-          </Card>
-
-          <Card title="Listado (con acciones)">
-            {sortedDrones.length === 0 ? (
-              <p className="text-sm text-gray-600">No hay drones todavía.</p>
-            ) : (
-              <ul className="divide-y">
-                {sortedDrones.map((drone) => (
-                  <li key={drone.id} className="py-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="font-medium">
-                          {drone.brand} — {drone.model}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {drone.drone_type}
-                          {drone.notes ? ` · ${drone.notes}` : ""}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm text-gray-500">#{drone.id}</div>
-                        <Button variant="outline" onClick={() => startEdit(drone)} disabled={busy}>
-                          Edit
-                        </Button>
-                        <Button variant="outline" onClick={() => handleDelete(drone.id)} disabled={busy}>
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }

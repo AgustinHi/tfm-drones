@@ -6,9 +6,12 @@ from sqlalchemy.orm import Session
 
 from auth_routes import get_current_user_email, router as auth_router
 from db import engine
+from db import engine, create_tables
 from models import Drone
 
 app = FastAPI(title="TFM Drones API")
+create_tables()
+
 app.include_router(auth_router)
 
 # CORS: permite que el frontend (Vite) pueda llamar a la API

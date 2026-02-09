@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -39,28 +39,43 @@ def get_current_user_email(authorization: str | None = Header(default=None)) -> 
         )
 
     token = authorization.split(" ", 1)[1].strip()
+
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-        email = payload.get("sub")
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-            )
-        return str(email)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         )
 
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
 
-@router.post("/register")
+    return str(email)
+
+
+@router.get("/me")
+def me(email: str = Depends(get_current_user_email)):
+    """
+    Endpoint estándar para comprobar autenticación.
+    Devuelve el email asociado al token.
+    """
+    return {"email": email}
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterPayload):
     with Session(engine) as session:
         existing = session.scalar(select(User).where(User.email == payload.email))
         if existing is not None:
-            return {"error": "email already exists"}
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already exists",
+            )
 
         u = User(
             email=payload.email,
@@ -78,10 +93,16 @@ def login(payload: LoginPayload):
     with Session(engine) as session:
         u = session.scalar(select(User).where(User.email == payload.email))
         if u is None:
-            return {"error": "invalid credentials"}
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
 
         if not verify_password(payload.password, u.password_hash):
-            return {"error": "invalid credentials"}
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
 
         token = create_access_token(subject=u.email)
         return {"access_token": token, "token_type": "bearer"}
