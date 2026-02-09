@@ -12,26 +12,22 @@ const isValidPassword = (v) => v.trim().length >= 6;
 export default function Manage() {
   const [drones, setDrones] = useState([]);
 
-  // Auth
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
-  const [authMode, setAuthMode] = useState("login"); // login | register
+  const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // Feedback
   const [authError, setAuthError] = useState("");
   const [authSuccess, setAuthSuccess] = useState("");
   const [crudError, setCrudError] = useState("");
   const [crudSuccess, setCrudSuccess] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Create
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [droneType, setDroneType] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Edit
   const [editingId, setEditingId] = useState(null);
   const [editBrand, setEditBrand] = useState("");
   const [editModel, setEditModel] = useState("");
@@ -41,6 +37,13 @@ export default function Manage() {
   const sortedDrones = useMemo(() => {
     return [...drones].sort((a, b) => a.id - b.id);
   }, [drones]);
+
+  const resetFeedback = () => {
+    setAuthError("");
+    setAuthSuccess("");
+    setCrudError("");
+    setCrudSuccess("");
+  };
 
   const loadDrones = () => {
     api
@@ -53,12 +56,21 @@ export default function Manage() {
     loadDrones();
   }, []);
 
-  const resetFeedback = () => {
-    setAuthError("");
-    setAuthSuccess("");
-    setCrudError("");
-    setCrudSuccess("");
-  };
+  // ✅ logout global (401)
+  useEffect(() => {
+    const onLogout = () => {
+      setLoggedIn(false);
+      setEditingId(null);
+      setBusy(false);
+      setCrudSuccess("");
+      setCrudError("");
+      setAuthSuccess("");
+      setAuthError("Sesión caducada. Vuelve a iniciar sesión.");
+    };
+
+    window.addEventListener("auth:logout", onLogout);
+    return () => window.removeEventListener("auth:logout", onLogout);
+  }, []);
 
   const logout = () => {
     clearToken();
@@ -74,34 +86,23 @@ export default function Manage() {
     const eVal = email.trim();
     const pVal = password.trim();
 
-    if (!isValidEmail(eVal)) {
-      setAuthError("Email no válido.");
-      return;
-    }
-    if (!isValidPassword(pVal)) {
-      setAuthError("La contraseña debe tener al menos 6 caracteres.");
-      return;
-    }
+    if (!isValidEmail(eVal)) return setAuthError("Email no válido.");
+    if (!isValidPassword(pVal))
+      return setAuthError("La contraseña debe tener al menos 6 caracteres.");
 
     try {
       setBusy(true);
 
       if (authMode === "register") {
         const res = await api.post("/auth/register", { email: eVal, password: pVal });
-        if (res.data?.error) {
-          setAuthError(res.data.error);
-          return;
-        }
+        if (res.data?.error) return setAuthError(res.data.error);
         setAuthSuccess("Usuario creado. Ahora inicia sesión.");
         setAuthMode("login");
         return;
       }
 
       const res = await api.post("/auth/login", { email: eVal, password: pVal });
-      if (res.data?.error) {
-        setAuthError(res.data.error);
-        return;
-      }
+      if (res.data?.error) return setAuthError(res.data.error);
 
       setToken(res.data.access_token);
       setLoggedIn(true);
@@ -132,11 +133,7 @@ export default function Manage() {
 
     try {
       setBusy(true);
-      const res = await api.post("/drones", payload);
-      if (res.data?.error) {
-        setCrudError(res.data.error);
-        return;
-      }
+      await api.post("/drones", payload);
       setBrand("");
       setModel("");
       setDroneType("");
@@ -144,7 +141,8 @@ export default function Manage() {
       setCrudSuccess("Drone creado.");
       loadDrones();
     } catch (err) {
-      setCrudError("No se pudo crear (¿sesión caducada?).");
+      if (!err?.response) setCrudError("Backend no disponible (¿backend apagado?).");
+      else if (err.response.status !== 401) setCrudError("No se pudo crear.");
       console.error(err);
     } finally {
       setBusy(false);
@@ -187,16 +185,13 @@ export default function Manage() {
 
     try {
       setBusy(true);
-      const res = await api.put(`/drones/${editingId}`, payload);
-      if (res.data?.error) {
-        setCrudError(res.data.error);
-        return;
-      }
+      await api.put(`/drones/${editingId}`, payload);
       setCrudSuccess("Drone actualizado.");
       cancelEdit();
       loadDrones();
     } catch (err) {
-      setCrudError("No se pudo actualizar (¿sesión caducada?).");
+      if (!err?.response) setCrudError("Backend no disponible (¿backend apagado?).");
+      else if (err.response.status !== 401) setCrudError("No se pudo actualizar.");
       console.error(err);
     } finally {
       setBusy(false);
@@ -207,16 +202,13 @@ export default function Manage() {
     resetFeedback();
     try {
       setBusy(true);
-      const res = await api.delete(`/drones/${id}`);
-      if (res.data?.error) {
-        setCrudError(res.data.error);
-        return;
-      }
+      await api.delete(`/drones/${id}`);
       setCrudSuccess("Drone borrado.");
       if (editingId === id) cancelEdit();
       loadDrones();
     } catch (err) {
-      setCrudError("No se pudo borrar (¿sesión caducada?).");
+      if (!err?.response) setCrudError("Backend no disponible (¿backend apagado?).");
+      else if (err.response.status !== 401) setCrudError("No se pudo borrar.");
       console.error(err);
     } finally {
       setBusy(false);
@@ -229,9 +221,7 @@ export default function Manage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Gestión</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Login/register + CRUD de drones (solo logueados)
-            </p>
+            <p className="mt-1 text-sm text-gray-600">Login/register + CRUD (solo logueados)</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -246,28 +236,19 @@ export default function Manage() {
           </div>
         </div>
 
-        {/* Mensajes globales */}
         {(authError || authSuccess || crudError || crudSuccess) && (
           <div className="mt-6 grid gap-2">
             {authError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">
-                {authError}
-              </div>
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">{authError}</div>
             ) : null}
             {authSuccess ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">
-                {authSuccess}
-              </div>
+              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">{authSuccess}</div>
             ) : null}
             {crudError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">
-                {crudError}
-              </div>
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">{crudError}</div>
             ) : null}
             {crudSuccess ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">
-                {crudSuccess}
-              </div>
+              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">{crudSuccess}</div>
             ) : null}
           </div>
         )}
@@ -297,20 +278,12 @@ export default function Manage() {
               </div>
 
               <form onSubmit={handleAuthSubmit} className="mt-4 grid gap-3">
-                <Input
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="test@example.com"
-                  required
-                />
+                <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 <Input
                   label="Password (mín. 6)"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="123456"
                   required
                 />
                 <Button type="submit" disabled={busy}>
@@ -327,12 +300,7 @@ export default function Manage() {
               <form onSubmit={handleCreate} className="grid gap-3">
                 <Input label="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} required />
                 <Input label="Model" value={model} onChange={(e) => setModel(e.target.value)} required />
-                <Input
-                  label="Drone type"
-                  value={droneType}
-                  onChange={(e) => setDroneType(e.target.value)}
-                  required
-                />
+                <Input label="Drone type" value={droneType} onChange={(e) => setDroneType(e.target.value)} required />
                 <Input label="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
                 <Button type="submit" disabled={busy}>
                   {busy ? "Creando..." : "Add Drone"}
