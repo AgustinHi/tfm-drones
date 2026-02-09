@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -10,12 +10,9 @@ from models import Drone
 
 app = FastAPI(title="TFM Drones API")
 
-# Crear tablas al arrancar (idempotente)
 create_tables()
-
 app.include_router(auth_router)
 
-# CORS: permite que el frontend (Vite) pueda llamar a la API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -29,22 +26,37 @@ app.add_middleware(
 
 
 class DroneCreate(BaseModel):
-    brand: str
-    model: str
-    drone_type: str
+    # Tarjeta
+    name: str
+    comment: str | None = None
+
+    # Selecciones / rellenables
+    controller: str | None = None  # Betaflight | Kiss
+    video: str | None = None       # Analogico | Digital
+    radio: str | None = None
+    components: str | None = None
+
+    # Campos antiguos (compat)
+    brand: str | None = ""
+    model: str | None = ""
+    drone_type: str | None = ""
     notes: str | None = None
 
 
-class DroneUpdate(BaseModel):
-    brand: str
-    model: str
-    drone_type: str
-    notes: str | None = None
+class DroneUpdate(DroneCreate):
+    pass
 
 
 def drone_to_dict(d: Drone) -> dict:
     return {
         "id": d.id,
+        "name": d.name,
+        "comment": d.comment,
+        "controller": d.controller,
+        "video": d.video,
+        "radio": d.radio,
+        "components": d.components,
+        # antiguos
         "brand": d.brand,
         "model": d.model,
         "drone_type": d.drone_type,
@@ -69,10 +81,7 @@ def get_drone(drone_id: int, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Drone not found",
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Drone not found")
         return drone_to_dict(d)
 
 
@@ -80,9 +89,15 @@ def get_drone(drone_id: int, user_email: str = Depends(get_current_user_email)):
 def create_drone(payload: DroneCreate, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = Drone(
-            brand=payload.brand,
-            model=payload.model,
-            drone_type=payload.drone_type,
+            name=payload.name,
+            comment=payload.comment,
+            controller=payload.controller,
+            video=payload.video,
+            radio=payload.radio,
+            components=payload.components,
+            brand=payload.brand or "",
+            model=payload.model or "",
+            drone_type=payload.drone_type or "",
             notes=payload.notes,
         )
         session.add(d)
@@ -92,22 +107,23 @@ def create_drone(payload: DroneCreate, user_email: str = Depends(get_current_use
 
 
 @app.put("/drones/{drone_id}")
-def update_drone(
-    drone_id: int,
-    payload: DroneUpdate,
-    user_email: str = Depends(get_current_user_email),
-):
+def update_drone(drone_id: int, payload: DroneUpdate, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Drone not found",
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Drone not found")
 
-        d.brand = payload.brand
-        d.model = payload.model
-        d.drone_type = payload.drone_type
+        d.name = payload.name
+        d.comment = payload.comment
+        d.controller = payload.controller
+        d.video = payload.video
+        d.radio = payload.radio
+        d.components = payload.components
+
+        # antiguos (compat)
+        d.brand = payload.brand or ""
+        d.model = payload.model or ""
+        d.drone_type = payload.drone_type or ""
         d.notes = payload.notes
 
         session.commit()
@@ -115,16 +131,13 @@ def update_drone(
         return drone_to_dict(d)
 
 
-@app.delete("/drones/{drone_id}")
+@app.delete("/drones/{drone_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_drone(drone_id: int, user_email: str = Depends(get_current_user_email)):
     with Session(engine) as session:
         d = session.get(Drone, drone_id)
         if d is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Drone not found",
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Drone not found")
 
         session.delete(d)
         session.commit()
-        return {"deleted": drone_id}
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
