@@ -28,12 +28,15 @@ export default function Home() {
   };
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const raw = query.trim().toLowerCase();
+    const q = raw.startsWith("#") ? raw.slice(1).trim() : raw;
+
     const base = [...drones].sort((a, b) => a.id - b.id);
     if (!q) return base;
 
     return base.filter((d) => {
-      const text = `${d.id} ${d.brand ?? ""} ${d.model ?? ""} ${d.drone_type ?? ""} ${d.notes ?? ""}`.toLowerCase();
+      const idText = String(d.id ?? "");
+      const text = `${idText} ${d.brand ?? ""} ${d.model ?? ""} ${d.drone_type ?? ""} ${d.notes ?? ""}`.toLowerCase();
       return text.includes(q);
     });
   }, [drones, query]);
@@ -74,7 +77,7 @@ export default function Home() {
                 label="Buscar"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Marca, modelo, tipo, notas..."
+                placeholder="Marca, modelo, tipo, notas... (ej: DJI o #1)"
               />
             </div>
 
