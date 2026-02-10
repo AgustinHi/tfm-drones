@@ -150,4 +150,6 @@ backend/.env
 
 .vscode/
 
+backend/uploads/
+
 
