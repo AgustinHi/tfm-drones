@@ -1,8 +1,15 @@
+import * as React from "react";
+import { Card as ShadCard, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+
 export default function Card({ title, children, className = "" }) {
   return (
-    <div className={`rounded-xl border bg-white p-4 shadow-sm ${className}`}>
-      {title ? <h2 className="text-lg font-semibold">{title}</h2> : null}
-      <div className={title ? "mt-4" : ""}>{children}</div>
-    </div>
+    <ShadCard className={className}>
+      {title ? (
+        <CardHeader className="pb-3">
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+      ) : null}
+      <CardContent className={title ? "pt-0" : ""}>{children}</CardContent>
+    </ShadCard>
   );
 }

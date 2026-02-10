@@ -16,7 +16,7 @@ export default function Login() {
   const from = location.state?.from || "/manage";
   const reason = location.state?.reason || null;
 
-  const [authMode, setAuthMode] = useState("login");
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -29,7 +29,6 @@ export default function Login() {
     setAuthSuccess("");
   };
 
-  // ✅ 1) Mensaje persistido por el interceptor (401 -> /login)
   useEffect(() => {
     const msg = localStorage.getItem(SESSION_MSG_KEY);
     if (msg) {
@@ -39,25 +38,12 @@ export default function Login() {
     }
   }, []);
 
-  // ✅ 2) Si venimos expulsados por state (compatibilidad)
   useEffect(() => {
     if (reason === "expired") {
       setAuthSuccess("");
       setAuthError("Sesión caducada. Vuelve a iniciar sesión.");
     }
   }, [reason]);
-
-  // ✅ 3) Backup: evento (si lo usas en algún punto)
-  useEffect(() => {
-    const onLogout = () => {
-      setBusy(false);
-      setAuthSuccess("");
-      setAuthError("Sesión caducada. Vuelve a iniciar sesión.");
-    };
-
-    window.addEventListener("auth:logout", onLogout);
-    return () => window.removeEventListener("auth:logout", onLogout);
-  }, []);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -95,12 +81,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="mx-auto max-w-3xl p-4 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Acceso</h1>
-            <p className="mt-1 text-sm text-gray-600">Login / register</p>
+    <div className="grid gap-6">
+      <div className="rounded-2xl border bg-card p-6 text-card-foreground shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-extrabold tracking-tight">Acceso</h1>
+            <p className="text-sm text-muted-foreground">Login / Register</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -109,57 +95,77 @@ export default function Login() {
             </Link>
           </div>
         </div>
-
-        {(authError || authSuccess) && (
-          <div className="mt-6 grid gap-2">
-            {authError ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm">{authError}</div>
-            ) : null}
-            {authSuccess ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm">{authSuccess}</div>
-            ) : null}
-          </div>
-        )}
-
-        <div className="mt-6">
-          <Card title="Acceso">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant={authMode === "login" ? "default" : "outline"}
-                onClick={() => {
-                  resetFeedback();
-                  setAuthMode("login");
-                }}
-              >
-                Login
-              </Button>
-              <Button
-                variant={authMode === "register" ? "default" : "outline"}
-                onClick={() => {
-                  resetFeedback();
-                  setAuthMode("register");
-                }}
-              >
-                Register
-              </Button>
-            </div>
-
-            <form onSubmit={handleAuthSubmit} className="mt-4 grid gap-3">
-              <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              <Input
-                label="Password (mín. 6)"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <Button type="submit" disabled={busy}>
-                {busy ? "Procesando..." : authMode === "login" ? "Login" : "Register"}
-              </Button>
-            </form>
-          </Card>
-        </div>
       </div>
+
+      {(authError || authSuccess) ? (
+        <div
+          className={[
+            "rounded-xl border px-4 py-3 text-sm",
+            authError
+              ? "border-destructive/30 bg-destructive/10 text-destructive"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+          ].join(" ")}
+        >
+          {authError || authSuccess}
+        </div>
+      ) : null}
+
+      <Card title="Acceso">
+        <div className="grid gap-4">
+          {/* Tabs */}
+          <div className="inline-flex w-fit rounded-xl border bg-background p-1">
+            <button
+              type="button"
+              onClick={() => {
+                resetFeedback();
+                setAuthMode("login");
+              }}
+              className={[
+                "rounded-lg px-3 py-2 text-sm font-bold transition",
+                authMode === "login" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetFeedback();
+                setAuthMode("register");
+              }}
+              className={[
+                "rounded-lg px-3 py-2 text-sm font-bold transition",
+                authMode === "register"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              ].join(" ")}
+            >
+              Register
+            </button>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} className="grid gap-3">
+            <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <Input
+              label="Password (mín. 6)"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+
+            <Button type="submit" disabled={busy} className="mt-1">
+              {busy ? "Procesando..." : authMode === "login" ? "Login" : "Register"}
+            </Button>
+
+            <p className="text-xs text-muted-foreground">
+              {authMode === "login"
+                ? "Si no tienes cuenta, pulsa Register."
+                : "Tras registrarte, volverás a Login automáticamente."}
+            </p>
+          </form>
+        </div>
+      </Card>
     </div>
   );
 }

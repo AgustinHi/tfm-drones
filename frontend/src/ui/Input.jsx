@@ -1,3 +1,6 @@
+import * as React from "react";
+import { Input as ShadInput } from "../components/ui/input";
+
 export default function Input({
   label,
   type = "text",
@@ -5,18 +8,21 @@ export default function Input({
   onChange,
   placeholder = "",
   required = false,
+  className = "",
+  ...props
 }) {
   return (
-    <div className="grid gap-1">
-      {label ? <label className="text-sm font-medium">{label}</label> : null}
-      <input
-        className="rounded-lg border px-3 py-2 outline-none focus:ring"
+    <label className="grid gap-1">
+      {label ? <span className="text-sm font-medium">{label}</span> : null}
+      <ShadInput
         type={type}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
         required={required}
+        className={className}
+        {...props}
       />
-    </div>
+    </label>
   );
 }
