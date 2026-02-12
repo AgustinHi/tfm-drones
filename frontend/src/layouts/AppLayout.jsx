@@ -1,18 +1,28 @@
+// frontend/src/layouts/AppLayout.jsx
 import { Link, useLocation } from "react-router-dom";
 import { isLoggedIn } from "../auth";
 import Button from "../ui/Button";
+import { useTranslation } from "react-i18next";
 
 const BG_URL = "/bg-hangar.jpeg";
 
-function formatPath(pathname) {
-  if (!pathname || pathname === "/") return "Inicio";
+function formatPath(pathname, t) {
+  if (!pathname || pathname === "/") return t("nav.home", { defaultValue: "Inicio" });
   const parts = pathname.split("/").filter(Boolean);
 
-  if (parts[0] === "login") return "Iniciar sesión";
-  if (parts[0] === "manage") return "Gestión";
-  if (parts[0] === "drones" && parts.length === 2) return `Dron #${parts[1]}`;
+  if (parts[0] === "login") return t("nav.login", { defaultValue: "Iniciar sesión" });
+  if (parts[0] === "manage") return t("nav.manage", { defaultValue: "Gestión" });
+
+  if (parts[0] === "drones" && parts.length === 2) {
+    return t("nav.drone", { defaultValue: `Dron #${parts[1]}`, id: parts[1] });
+  }
+
   if (parts[0] === "drones" && parts[2] === "dumps" && parts[4] === "parse") {
-    return `Dron #${parts[1]} · Dump #${parts[3]} · Parse`;
+    return t("nav.dumpParse", {
+      defaultValue: `Dron #${parts[1]} · Dump #${parts[3]} · Parse`,
+      droneId: parts[1],
+      dumpId: parts[3],
+    });
   }
 
   return parts.map((s) => (s.length ? s[0].toUpperCase() + s.slice(1) : s)).join(" / ");
@@ -36,31 +46,83 @@ function NavLink({ to, children }) {
   );
 }
 
+function LanguageSwitch() {
+  const { i18n, t } = useTranslation();
+  const lang = i18n.language === "en" ? "en" : "es";
+
+  const setLang = (next) => {
+    if (next === lang) return;
+    i18n.changeLanguage(next);
+  };
+
+  return (
+    <div
+      className={[
+        "inline-flex items-center gap-1 rounded-xl bg-white/45 p-1 shadow-sm backdrop-blur-xl ring-1 ring-black/10",
+      ].join(" ")}
+      aria-label={t("lang.aria", { defaultValue: "Selector de idioma" })}
+    >
+      <button
+        type="button"
+        onClick={() => setLang("es")}
+        className={[
+          "h-9 rounded-lg px-3 text-xs font-extrabold transition",
+          lang === "es" ? "bg-primary/14 text-foreground shadow-sm" : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
+        ].join(" ")}
+        aria-pressed={lang === "es"}
+      >
+        ES
+      </button>
+      <button
+        type="button"
+        onClick={() => setLang("en")}
+        className={[
+          "h-9 rounded-lg px-3 text-xs font-extrabold transition",
+          lang === "en" ? "bg-primary/14 text-foreground shadow-sm" : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
+        ].join(" ")}
+        aria-pressed={lang === "en"}
+      >
+        EN
+      </button>
+    </div>
+  );
+}
+
 function MobileNav() {
+  const { pathname } = useLocation();
   const logged = isLoggedIn();
+  const isHome = pathname === "/";
+  const { t } = useTranslation();
+
   return (
     <div className="border-t border-border/40 bg-white/55 backdrop-blur-xl sm:hidden">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2">
-        <Link
-          to="/"
-          className="rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
-        >
-          Inicio
-        </Link>
+        {!isHome ? (
+          <Link
+            to="/"
+            className="rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
+          >
+            {t("nav.home", { defaultValue: "Inicio" })}
+          </Link>
+        ) : (
+          <span className="px-3 py-2 text-sm font-semibold text-muted-foreground/60">
+            {t("nav.home", { defaultValue: "Inicio" })}
+          </span>
+        )}
 
         {logged ? (
           <Link
             to="/manage"
             className="rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
           >
-            Gestión
+            {t("nav.manage", { defaultValue: "Gestión" })}
           </Link>
         ) : (
           <Link
             to="/login"
             className="rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
           >
-            Iniciar sesión
+            {t("nav.login", { defaultValue: "Iniciar sesión" })}
           </Link>
         )}
       </div>
@@ -71,6 +133,8 @@ function MobileNav() {
 function Topbar() {
   const location = useLocation();
   const logged = isLoggedIn();
+  const isHome = location.pathname === "/";
+  const { t } = useTranslation();
 
   return (
     <header className="sticky top-0 z-40">
@@ -98,30 +162,46 @@ function Topbar() {
                 <span className="text-xs font-black tracking-[0.18em] pl-[0.18em]">DH</span>
               </span>
 
-              <span className="truncate">DronHangar</span>
+              <span className="truncate">{t("appName", { defaultValue: "DronHangar" })}</span>
             </Link>
 
             <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-              {formatPath(location.pathname)}
+              {formatPath(location.pathname, t)}
             </span>
           </div>
 
           <nav className="hidden items-center gap-1 sm:flex">
-            <NavLink to="/">Inicio</NavLink>
-            {logged ? <NavLink to="/manage">Gestión</NavLink> : <NavLink to="/login">Iniciar sesión</NavLink>}
+            {/* Ocultar "Inicio" cuando ya estamos en "/" */}
+            {!isHome ? <NavLink to="/">{t("nav.home", { defaultValue: "Inicio" })}</NavLink> : null}
+            {logged ? (
+              <NavLink to="/manage">{t("nav.manage", { defaultValue: "Gestión" })}</NavLink>
+            ) : (
+              <NavLink to="/login">{t("nav.login", { defaultValue: "Iniciar sesión" })}</NavLink>
+            )}
           </nav>
 
-          <div className="flex items-center gap-2 sm:hidden">
-            {logged ? (
-              <Link to="/manage">
-                <Button variant="outline">Gestión</Button>
-              </Link>
-            ) : (
-              <Link to="/login">
-                <Button variant="outline">Iniciar sesión</Button>
-              </Link>
-            )}
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:block">
+              <LanguageSwitch />
+            </div>
+
+            <div className="flex items-center gap-2 sm:hidden">
+              {logged ? (
+                <Link to="/manage">
+                  <Button variant="outline">{t("nav.manage", { defaultValue: "Gestión" })}</Button>
+                </Link>
+              ) : (
+                <Link to="/login">
+                  <Button variant="outline">{t("nav.login", { defaultValue: "Iniciar sesión" })}</Button>
+                </Link>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* En móvil lo ponemos debajo para no cargar la topbar */}
+        <div className="sm:hidden px-4 pb-3">
+          <LanguageSwitch />
         </div>
 
         <MobileNav />
@@ -134,6 +214,7 @@ function Footer() {
   const logged = isLoggedIn();
   const secondaryHref = logged ? "/manage" : "/login";
   const secondaryLabel = logged ? "Gestión" : "Iniciar sesión";
+  const { t } = useTranslation();
 
   return (
     <footer className="mt-auto">
@@ -154,12 +235,13 @@ function Footer() {
         <div className="relative mx-auto flex max-w-5xl flex-col gap-3 px-4 py-8 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} DronHangar · Gestión y consulta de drones
+              © {new Date().getFullYear()} {t("appName", { defaultValue: "DronHangar" })} ·{" "}
+              {t("footer.tagline", { defaultValue: "Gestión y consulta de drones" })}
             </p>
 
             <div className="flex items-center gap-3 text-sm">
               <Link to="/" className="text-muted-foreground hover:text-foreground">
-                Inicio
+                {t("nav.home", { defaultValue: "Inicio" })}
               </Link>
               <span className="text-muted-foreground/40">·</span>
               <Link to={secondaryHref} className="text-muted-foreground hover:text-foreground">

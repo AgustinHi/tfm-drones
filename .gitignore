@@ -153,3 +153,5 @@ backend/.env
 backend/uploads/
 
 
+frontend/public/img1.jpeg
+frontend/public/img2.jpeg
