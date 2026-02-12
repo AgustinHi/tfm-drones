@@ -1,71 +1,184 @@
 @import "tailwindcss";
 
-/* shadcn/ui tokens */
+/* =========================
+   THEME: "drone-tech" (DronHangar)
+   - Más contraste
+   - Acento mejor definido
+   - Glass + glow se ven “premium”
+   ========================= */
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* Base */
+  --background: 220 22% 98%;
+  --foreground: 222 60% 7%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 222 60% 7%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
+  --popover-foreground: 222 60% 7%;
 
-  --primary: 222.2 47.4% 11.2%;
+  /* Brand */
+  --primary: 200 96% 42%;
   --primary-foreground: 210 40% 98%;
 
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
+  /* Neutral surfaces */
+  --secondary: 220 18% 95%;
+  --secondary-foreground: 222 45% 11%;
 
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 220 16% 94%;
+  --muted-foreground: 215 18% 38%;
 
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  /* Accent: un punto más “cian” para que el hover se note */
+  --accent: 200 55% 90%;
+  --accent-foreground: 222 60% 7%;
 
-  --destructive: 0 84.2% 60.2%;
+  /* Feedback */
+  --destructive: 0 82% 56%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  /* Surfaces */
+  --border: 220 14% 87%;
+  --input: 220 14% 87%;
+  --ring: 200 96% 42%;
 
-  --radius: 0.75rem;
+  --radius: 0.95rem;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
+  --background: 222 38% 7%;
   --foreground: 210 40% 98%;
 
-  --card: 222.2 84% 4.9%;
+  --card: 222 36% 10%;
   --card-foreground: 210 40% 98%;
 
-  --popover: 222.2 84% 4.9%;
+  --popover: 222 36% 10%;
   --popover-foreground: 210 40% 98%;
 
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+  --primary: 200 95% 56%;
+  --primary-foreground: 222 36% 10%;
 
-  --secondary: 217.2 32.6% 17.5%;
+  --secondary: 222 28% 14%;
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+  --muted: 222 28% 14%;
+  --muted-foreground: 215 22% 72%;
 
-  --accent: 217.2 32.6% 17.5%;
+  /* Accent dark: ligeramente más visible (para hover en nav/cards) */
+  --accent: 200 22% 18%;
   --accent-foreground: 210 40% 98%;
 
-  --destructive: 0 62.8% 30.6%;
+  --destructive: 0 65% 45%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+  --border: 222 26% 18%;
+  --input: 222 26% 18%;
+  --ring: 200 95% 56%;
+}
+
+/* =========================
+   Global base
+   ========================= */
+
+html,
+body {
+  height: 100%;
 }
 
 body {
+  margin: 0; /* <-- IMPORTANTE: elimina el hueco superior por defecto del navegador */
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     "Apple Color Emoji", "Segoe UI Emoji";
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100%; /* <-- asegura que el layout ocupe toda la altura */
+}
+
+/* Fondo con identidad (sutil) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+
+  background:
+    radial-gradient(80rem 40rem at 10% -10%, hsl(var(--accent)) 0%, transparent 60%),
+    radial-gradient(70rem 40rem at 90% -10%, hsl(var(--secondary)) 0%, transparent 60%),
+    radial-gradient(60rem 35rem at 50% 110%, hsl(var(--accent)) 0%, transparent 55%);
+
+  opacity: 0.92;
+}
+
+.dark body::before {
+  opacity: 0.85;
+}
+
+/* Grano suave (data-uri OK en Vite; si te diera guerra, lo quitamos) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.45'/%3E%3C/svg%3E");
+}
+
+.dark body::after {
+  opacity: 0.08;
+}
+
+/* Selección de texto (sin barra alpha para máxima compatibilidad) */
+::selection {
+  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+}
+
+/* Scrollbar (solo webkit) */
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  opacity: 0.35;
+}
+*::-webkit-scrollbar-thumb:hover {
+  opacity: 0.55;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Focus accesible */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--ring));
+  border-radius: calc(var(--radius) - 0.25rem);
+}
+
+/* Inputs nativos */
+input,
+select,
+textarea {
+  color: inherit;
+}
+
+/* Defaults */
+a {
+  text-decoration: none;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
 }
