@@ -1,10 +1,11 @@
 // frontend/src/pages/DroneDetail.jsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
+import { useTranslation } from "react-i18next";
 
 const CONTROLLERS = ["", "Betaflight", "Kiss"];
 const VIDEOS = ["", "Analogico", "Digital"];
@@ -14,9 +15,9 @@ const VIDEOS = ["", "Analogico", "Digital"];
  * - GET  /drones/{drone_id}/dumps   -> listar dumps del dron
  * - POST /dumps                    -> subir dump (multipart)
  *
- * Asunción mínima (ajustable en 1 línea si tu backend usa otros nombres):
- * - multipart field: "file"
- * - drone id field: "drone_id"
+ * Nota: para evitar fallo por nombres de campos distintos, enviamos variantes:
+ * - file + dump_file (binary)
+ * - drone_id + droneId (string)
  */
 const API_LIST_DUMPS = (droneId) => `/drones/${droneId}/dumps`;
 const API_UPLOAD_DUMP = () => `/dumps`;
@@ -83,7 +84,12 @@ function ReadField({ label, value }) {
   );
 }
 
-function Select({ label, value, onChange, options }) {
+function Select({ label, value, onChange, options, getOptionLabel }) {
+  const labelFor = (x) => {
+    if (x === "") return "—";
+    return getOptionLabel ? getOptionLabel(x) : x;
+  };
+
   return (
     <label className="grid gap-1">
       <span className="text-sm font-semibold text-muted-foreground">{label}</span>
@@ -102,7 +108,7 @@ function Select({ label, value, onChange, options }) {
         >
           {options.map((x) => (
             <option key={x} value={x}>
-              {x === "" ? "—" : x}
+              {labelFor(x)}
             </option>
           ))}
         </select>
@@ -128,6 +134,18 @@ export default function DroneDetail() {
   const navigate = useNavigate();
   const { droneId } = useParams();
 
+  const { t, i18n } = useTranslation();
+  const isEn = (i18n.resolvedLanguage || i18n.language || "es").startsWith("en");
+
+  const tv = useCallback(
+    (key, es, en, opts = {}) =>
+      t(key, {
+        defaultValue: isEn ? en : es,
+        ...opts,
+      }),
+    [t, isEn]
+  );
+
   const accent = accentColorForId(droneId);
 
   const [loading, setLoading] = useState(true);
@@ -150,6 +168,7 @@ export default function DroneDetail() {
   const [dumpBusy, setDumpBusy] = useState(false);
   const [dumpFile, setDumpFile] = useState(null);
   const [dumpMsg, setDumpMsg] = useState({ type: "", text: "" });
+  const dumpInputRef = useRef(null);
 
   const setError = (text) => setMsg({ type: "error", text });
   const setOk = (text) => setMsg({ type: "ok", text });
@@ -171,10 +190,12 @@ export default function DroneDetail() {
   };
 
   const subtitle = useMemo(() => {
-    if (loading) return "Cargando…";
-    if (!drone) return "No se pudo cargar el dron";
-    return isEditing ? "Editando características" : "Vista (solo lectura)";
-  }, [loading, drone, isEditing]);
+    if (loading) return tv("common.loading", "Cargando…", "Loading…");
+    if (!drone) return tv("detail.error.notLoaded", "No se pudo cargar el dron", "Could not load the drone");
+    return isEditing
+      ? tv("detail.subtitle.editing", "Editando características", "Editing details")
+      : tv("detail.subtitle.readonly", "Vista (solo lectura)", "View (read-only)");
+  }, [loading, drone, isEditing, tv]);
 
   async function fetchDrone() {
     clearMsg();
@@ -184,8 +205,8 @@ export default function DroneDetail() {
       setDrone(res.data);
       fillFormFromDrone(res.data);
     } catch (err) {
-      if (!err?.response) setError("Error de red: no se pudo contactar con el servidor.");
-      else setError(err?.response?.data?.detail || "Error cargando el dron.");
+      if (!err?.response) setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+      else setError(err?.response?.data?.detail || tv("detail.error.loading", "Error cargando el dron.", "Error loading the drone."));
       setDrone(null);
     } finally {
       setLoading(false);
@@ -207,7 +228,7 @@ export default function DroneDetail() {
       setDumps(arr);
     } catch (err) {
       setDumps([]);
-      setDumpError(err?.response?.data?.detail || "No se pudo cargar la lista de dumps.");
+      setDumpError(err?.response?.data?.detail || tv("detail.dumps.errorList", "No se pudo cargar la lista de dumps.", "Could not load dumps list."));
     }
   }
 
@@ -240,7 +261,7 @@ export default function DroneDetail() {
 
   const save = async () => {
     clearMsg();
-    if (!form.name.trim()) return setError("El nombre es obligatorio.");
+    if (!form.name.trim()) return setError(tv("detail.validation.name", "El nombre es obligatorio.", "Name is required."));
 
     try {
       setLoading(true);
@@ -258,21 +279,53 @@ export default function DroneDetail() {
       setDrone(res.data);
       fillFormFromDrone(res.data);
       setIsEditing(false);
-      setOk("Guardado correctamente.");
+      setOk(tv("detail.save.ok", "Guardado correctamente.", "Saved successfully."));
     } catch (err) {
-      if (!err?.response) setError("Error de red: no se pudo contactar con el servidor.");
-      else setError(err?.response?.data?.detail || "Error guardando el dron.");
+      if (!err?.response) setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+      else setError(err?.response?.data?.detail || tv("detail.save.error", "Error guardando el dron.", "Error saving the drone."));
     } finally {
       setLoading(false);
     }
   };
+
+  function extractApiError(err, fallback) {
+    if (!err) return fallback;
+    if (!err.response) return tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.");
+
+    const data = err.response.data;
+    if (typeof data === "string" && data.trim()) return data;
+
+    const detail = data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+
+    if (Array.isArray(detail) && detail.length) {
+      // típico 422 de FastAPI: lista de errores
+      const defaultItemMsg = tv("errors.validationItem", "Error de validación", "Validation error");
+
+      const lines = detail
+        .map((x) => {
+          const loc = Array.isArray(x?.loc) ? x.loc.join(".") : "";
+          const msg = x?.msg || defaultItemMsg;
+          return loc ? `${loc}: ${msg}` : msg;
+        })
+        .slice(0, 6);
+
+      return tv(
+        "errors.validationList",
+        `Error de validación (422):\n${lines.join("\n")}`,
+        `Validation error (422):\n${lines.join("\n")}`
+      );
+    }
+
+    return fallback;
+  }
 
   async function uploadDump(e) {
     e.preventDefault();
     clearDumpMsg();
 
     if (!dumpFile) {
-      setDumpError("Selecciona un archivo primero.");
+      setDumpError(tv("detail.dumps.pickFile", "Selecciona un archivo primero.", "Pick a file first."));
       return;
     }
 
@@ -280,18 +333,24 @@ export default function DroneDetail() {
       setDumpBusy(true);
 
       const fd = new FormData();
+
+      // Variantes de nombre (evita fallo si el backend usa otro campo)
       fd.append("file", dumpFile);
+      fd.append("dump_file", dumpFile);
+
       fd.append("drone_id", String(droneId));
+      fd.append("droneId", String(droneId));
 
       await api.post(API_UPLOAD_DUMP(), fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setDumpOk("Dump subido correctamente.");
+      setDumpOk(tv("detail.dumps.uploadOk", "Dump subido correctamente.", "Dump uploaded successfully."));
       setDumpFile(null);
+      if (dumpInputRef.current) dumpInputRef.current.value = "";
       await fetchDumps();
     } catch (err) {
-      setDumpError(err?.response?.data?.detail || "No se pudo subir el dump.");
+      setDumpError(extractApiError(err, tv("detail.dumps.uploadError", "No se pudo subir el dump.", "Could not upload the dump.")));
     } finally {
       setDumpBusy(false);
     }
@@ -300,14 +359,14 @@ export default function DroneDetail() {
   const readFields = useMemo(() => {
     const d = drone || {};
     return [
-      { label: "Nombre", value: d.name },
-      { label: "Controladora", value: d.controller },
-      { label: "Vídeo", value: d.video },
-      { label: "Radio", value: d.radio },
-      { label: "Componentes", value: d.components },
-      { label: "Comentario", value: d.comment, wide: true },
+      { label: tv("detail.fields.name", "Nombre", "Name"), value: d.name },
+      { label: tv("detail.fields.controller", "Controladora", "Flight controller"), value: d.controller },
+      { label: tv("detail.fields.video", "Vídeo", "Video"), value: d.video },
+      { label: tv("detail.fields.radio", "Radio", "Radio"), value: d.radio },
+      { label: tv("detail.fields.components", "Componentes", "Components"), value: d.components },
+      { label: tv("detail.fields.comment", "Comentario", "Notes"), value: d.comment, wide: true },
     ];
-  }, [drone]);
+  }, [drone, tv]);
 
   const hasAnyField = useMemo(() => {
     return readFields.some((f) => {
@@ -316,6 +375,12 @@ export default function DroneDetail() {
       return String(v).trim().length > 0;
     });
   }, [readFields]);
+
+  const videoOptionLabel = (v) => {
+    if (v === "Analogico") return tv("detail.video.analog", "Analógico", "Analog");
+    if (v === "Digital") return tv("detail.video.digital", "Digital", "Digital");
+    return v;
+  };
 
   return (
     <div className="grid gap-6">
@@ -343,32 +408,38 @@ export default function DroneDetail() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1 pr-16">
               <div className="flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent, opacity: 0.85 }} aria-hidden="true" />
-                <h1 className="text-4xl font-extrabold tracking-tight">Dron #{droneId}</h1>
+                <span
+                  className="inline-flex h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: accent, opacity: 0.85 }}
+                  aria-hidden="true"
+                />
+                <h1 className="text-4xl font-extrabold tracking-tight">
+                  {tv("detail.header.title", "Dron #{{id}}", "Drone #{{id}}", { id: droneId })}
+                </h1>
               </div>
               <p className="text-sm text-muted-foreground">{subtitle}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pr-16">
               <Button variant="outline" onClick={() => navigate("/manage")}>
-                Volver a Gestión
+                {tv("detail.actions.backManage", "Volver a Gestión", "Back to Manage")}
               </Button>
 
               <Button variant="outline" onClick={fetchDrone} disabled={loading}>
-                {loading ? "Cargando..." : "Recargar"}
+                {loading ? tv("common.loadingBtn", "Cargando...", "Loading...") : tv("common.reload", "Recargar", "Reload")}
               </Button>
 
               {!isEditing ? (
                 <Button onClick={startEdit} disabled={loading || !drone}>
-                  Editar
+                  {tv("common.edit", "Editar", "Edit")}
                 </Button>
               ) : (
                 <>
                   <Button onClick={save} disabled={loading}>
-                    Guardar
+                    {tv("common.save", "Guardar", "Save")}
                   </Button>
                   <Button variant="outline" onClick={cancelEdit} disabled={loading}>
-                    Cancelar
+                    {tv("common.cancel", "Cancelar", "Cancel")}
                   </Button>
                 </>
               )}
@@ -381,21 +452,27 @@ export default function DroneDetail() {
 
       {/* Body */}
       {loading ? (
-        <Card title="Cargando" className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
-          <p className="text-sm text-muted-foreground">Cargando…</p>
+        <Card title={tv("common.loadingTitle", "Cargando", "Loading")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+          <p className="text-sm text-muted-foreground">{tv("common.loading", "Cargando…", "Loading…")}</p>
         </Card>
       ) : !drone ? (
-        <Card title="Error" className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
-          <p className="text-sm text-muted-foreground">No se pudo cargar el dron.</p>
+        <Card title={tv("common.errorTitle", "Error", "Error")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+          <p className="text-sm text-muted-foreground">{tv("detail.error.notLoaded", "No se pudo cargar el dron.", "Could not load the drone.")}</p>
         </Card>
       ) : (
         <>
           {!isEditing ? (
             <>
               {/* Vista */}
-              <Card title="Vista" className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+              <Card title={tv("detail.view.title", "Vista", "View")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
                 {!hasAnyField ? (
-                  <p className="text-sm text-muted-foreground">Este dron aún no tiene características rellenadas.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {tv(
+                      "detail.view.empty",
+                      "Este dron aún no tiene características rellenadas.",
+                      "This drone doesn't have any details filled in yet."
+                    )}
+                  </p>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
                     {readFields.map((f) =>
@@ -412,14 +489,17 @@ export default function DroneDetail() {
               </Card>
 
               {/* Dumps */}
-              <Card title="Dumps" className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+              <Card title={tv("detail.dumps.title", "Dumps", "Dumps")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
                 <div className="grid gap-4">
                   <MessageBanner msg={dumpMsg} />
 
                   <form onSubmit={uploadDump} className="grid gap-3">
                     <label className="grid gap-1">
-                      <span className="text-sm font-semibold text-muted-foreground">Subir dump</span>
+                      <span className="text-sm font-semibold text-muted-foreground">
+                        {tv("detail.dumps.uploadLabel", "Subir dump", "Upload dump")}
+                      </span>
                       <input
+                        ref={dumpInputRef}
                         type="file"
                         onChange={(e) => setDumpFile(e.target.files?.[0] || null)}
                         className={[
@@ -431,18 +511,18 @@ export default function DroneDetail() {
 
                     <div className="flex flex-wrap items-center gap-2">
                       <Button type="submit" disabled={dumpBusy}>
-                        {dumpBusy ? "Subiendo..." : "Subir"}
+                        {dumpBusy ? tv("detail.dumps.uploading", "Subiendo...", "Uploading...") : tv("detail.dumps.uploadBtn", "Subir", "Upload")}
                       </Button>
 
                       <Button type="button" variant="outline" onClick={fetchDumps} disabled={dumpBusy}>
-                        Recargar dumps
+                        {tv("detail.dumps.reload", "Recargar dumps", "Reload dumps")}
                       </Button>
                     </div>
                   </form>
 
                   {dumps.length === 0 ? (
                     <div className="rounded-2xl bg-white/45 p-4 text-sm text-muted-foreground shadow-sm backdrop-blur-xl ring-1 ring-black/10">
-                      No hay dumps todavía.
+                      {tv("detail.dumps.empty", "No hay dumps todavía.", "No dumps yet.")}
                     </div>
                   ) : (
                     <ul className="divide-y divide-black/10 rounded-2xl bg-white/45 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
@@ -461,7 +541,7 @@ export default function DroneDetail() {
 
                               <div className="flex shrink-0 flex-wrap items-center gap-2">
                                 <Button onClick={() => navigate(PARSE_ROUTE(droneId, dumpId))} disabled={!dumpId}>
-                                  Parsear
+                                  {tv("detail.dumps.parse", "Parsear", "Parse")}
                                 </Button>
                               </div>
                             </div>
@@ -475,50 +555,54 @@ export default function DroneDetail() {
             </>
           ) : (
             /* Editar (sin dumps) */
-            <Card title="Editar características" className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+            <Card
+              title={tv("detail.edit.title", "Editar características", "Edit details")}
+              className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
+            >
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
-                  label="Nombre"
+                  label={tv("detail.fields.name", "Nombre", "Name")}
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Nombre del dron"
+                  placeholder={tv("detail.placeholders.name", "Nombre del dron", "Drone name")}
                   required
                 />
 
                 <Select
-                  label="Controladora"
+                  label={tv("detail.fields.controller", "Controladora", "Flight controller")}
                   value={form.controller}
                   onChange={(e) => setForm((f) => ({ ...f, controller: e.target.value }))}
                   options={CONTROLLERS}
                 />
 
                 <Select
-                  label="Vídeo"
+                  label={tv("detail.fields.video", "Vídeo", "Video")}
                   value={form.video}
                   onChange={(e) => setForm((f) => ({ ...f, video: e.target.value }))}
                   options={VIDEOS}
+                  getOptionLabel={videoOptionLabel}
                 />
 
                 <Input
-                  label="Radio"
+                  label={tv("detail.fields.radio", "Radio", "Radio")}
                   value={form.radio}
                   onChange={(e) => setForm((f) => ({ ...f, radio: e.target.value }))}
-                  placeholder="ELRS / Crossfire / etc."
+                  placeholder={tv("detail.placeholders.radio", "ELRS / Crossfire / etc.", "ELRS / Crossfire / etc.")}
                 />
 
                 <Input
-                  label="Componentes"
+                  label={tv("detail.fields.components", "Componentes", "Components")}
                   value={form.components}
                   onChange={(e) => setForm((f) => ({ ...f, components: e.target.value }))}
-                  placeholder="Motores, FC, ESC…"
+                  placeholder={tv("detail.placeholders.components", "Motores, FC, ESC…", "Motors, FC, ESC…")}
                 />
 
                 <label className="grid gap-1 md:col-span-2">
-                  <span className="text-sm font-semibold text-muted-foreground">Comentario</span>
+                  <span className="text-sm font-semibold text-muted-foreground">{tv("detail.fields.comment", "Comentario", "Notes")}</span>
                   <textarea
                     value={form.comment}
                     onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
-                    placeholder="Notas"
+                    placeholder={tv("detail.placeholders.notes", "Notas", "Notes")}
                     rows={4}
                     className={[
                       "w-full rounded-xl bg-white/45 backdrop-blur-xl px-3 py-2 text-sm shadow-sm",

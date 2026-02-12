@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import api, { SESSION_MSG_KEY } from "../api";
 import { setToken } from "../auth";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
+import { useTranslation } from "react-i18next";
 
 const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 const isValidPassword = (v) => v.trim().length >= 6;
@@ -15,6 +16,19 @@ export default function Login() {
 
   const from = location.state?.from || "/manage";
   const reason = location.state?.reason || null;
+
+  const { t, i18n } = useTranslation();
+  const isEn = (i18n.resolvedLanguage || i18n.language || "es").startsWith("en");
+
+  // tv estable (evita warning react-hooks/exhaustive-deps)
+  const tv = useCallback(
+    (key, es, en, opts = {}) =>
+      t(key, {
+        defaultValue: isEn ? en : es,
+        ...opts,
+      }),
+    [t, isEn]
+  );
 
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
@@ -34,6 +48,7 @@ export default function Login() {
     if (msg) {
       localStorage.removeItem(SESSION_MSG_KEY);
       setAuthSuccess("");
+      // Nota: msg puede venir ya “cocinado” desde otros puntos (no lo traducimos aquí).
       setAuthError(msg);
     }
   }, []);
@@ -41,9 +56,11 @@ export default function Login() {
   useEffect(() => {
     if (reason === "expired") {
       setAuthSuccess("");
-      setAuthError("Sesión caducada. Vuelve a iniciar sesión.");
+      setAuthError(
+        tv("login.reason.expired", "Sesión caducada. Vuelve a iniciar sesión.", "Session expired. Please sign in again.")
+      );
     }
-  }, [reason]);
+  }, [reason, tv]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -52,8 +69,18 @@ export default function Login() {
     const eVal = email.trim();
     const pVal = password.trim();
 
-    if (!isValidEmail(eVal)) return setAuthError("Email no válido.");
-    if (!isValidPassword(pVal)) return setAuthError("La contraseña debe tener al menos 6 caracteres.");
+    if (!isValidEmail(eVal)) {
+      return setAuthError(tv("login.validation.email", "Email no válido.", "Invalid email."));
+    }
+    if (!isValidPassword(pVal)) {
+      return setAuthError(
+        tv(
+          "login.validation.password",
+          "La contraseña debe tener al menos 6 caracteres.",
+          "Password must be at least 6 characters."
+        )
+      );
+    }
 
     try {
       setBusy(true);
@@ -61,7 +88,8 @@ export default function Login() {
       if (authMode === "register") {
         const res = await api.post("/auth/register", { email: eVal, password: pVal });
         if (res.data?.error) return setAuthError(res.data.error);
-        setAuthSuccess("Cuenta creada. Ahora puedes iniciar sesión.");
+
+        setAuthSuccess(tv("login.register.success", "Cuenta creada. Ahora puedes iniciar sesión.", "Account created. You can now sign in."));
         setAuthMode("login");
         return;
       }
@@ -70,10 +98,10 @@ export default function Login() {
       if (res.data?.error) return setAuthError(res.data.error);
 
       setToken(res.data.access_token);
-      setAuthSuccess("Sesión iniciada.");
+      setAuthSuccess(tv("login.login.success", "Sesión iniciada.", "Signed in."));
       navigate(from, { replace: true });
     } catch (err) {
-      setAuthError("Error de red o servidor.");
+      setAuthError(tv("login.error.network", "Error de red o servidor.", "Network or server error."));
       console.error(err);
     } finally {
       setBusy(false);
@@ -85,9 +113,7 @@ export default function Login() {
       className={[
         "rounded-2xl px-4 py-3 text-sm shadow-sm backdrop-blur",
         "ring-1 ring-black/10",
-        authError
-          ? "bg-destructive/10 text-destructive"
-          : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+        authError ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
       ].join(" ")}
     >
       {authError || authSuccess}
@@ -111,20 +137,24 @@ export default function Login() {
                   <span className="text-xs font-black tracking-[0.18em] pl-[0.18em]">DH</span>
                 </span>
                 <div className="leading-tight">
-                  <div className="text-sm font-extrabold tracking-tight">DronHangar</div>
-                  <div className="text-xs font-semibold text-muted-foreground">Acceso</div>
+                  <div className="text-sm font-extrabold tracking-tight">{t("appName", { defaultValue: "DronHangar" })}</div>
+                  <div className="text-xs font-semibold text-muted-foreground">{tv("login.kicker", "Acceso", "Access")}</div>
                 </div>
               </div>
 
-              <h1 className="text-3xl font-extrabold tracking-tight">Inicia sesión para continuar</h1>
+              <h1 className="text-3xl font-extrabold tracking-tight">{tv("login.title", "Inicia sesión para continuar", "Sign in to continue")}</h1>
               <p className="text-sm text-muted-foreground">
-                Accede a la zona de gestión para crear, editar y borrar drones.
+                {tv(
+                  "login.subtitle",
+                  "Accede a la zona de gestión para crear, editar y borrar drones.",
+                  "Access the Manage area to create, edit, and delete drones."
+                )}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <Link to="/">
-                <Button variant="outline">Volver</Button>
+                <Button variant="outline">{tv("common.back", "Volver", "Back")}</Button>
               </Link>
             </div>
           </div>
@@ -134,7 +164,7 @@ export default function Login() {
 
           {/* Formulario */}
           <div className="relative mt-6">
-            <Card title="Acceso">
+            <Card title={tv("login.cardTitle", "Acceso", "Access")}>
               <div className="grid gap-4">
                 {/* Tabs (bordes suaves) */}
                 <div className="inline-flex w-fit rounded-2xl bg-white/45 p-1 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
@@ -151,7 +181,7 @@ export default function Login() {
                         : "text-muted-foreground hover:text-foreground hover:bg-white/25",
                     ].join(" ")}
                   >
-                    Iniciar sesión
+                    {tv("login.tabs.signIn", "Iniciar sesión", "Sign in")}
                   </button>
 
                   <button
@@ -167,28 +197,36 @@ export default function Login() {
                         : "text-muted-foreground hover:text-foreground hover:bg-white/25",
                     ].join(" ")}
                   >
-                    Crear cuenta
+                    {tv("login.tabs.createAccount", "Crear cuenta", "Create account")}
                   </button>
                 </div>
 
                 <p className="text-xs text-muted-foreground">
                   {authMode === "login"
-                    ? "Si no tienes cuenta, crea una en “Crear cuenta”."
-                    : "Tras crear la cuenta, volverás a “Iniciar sesión” automáticamente."}
+                    ? tv(
+                        "login.help.login",
+                        "Si no tienes cuenta, crea una en “Crear cuenta”.",
+                        "If you don’t have an account, create one in “Create account”."
+                      )
+                    : tv(
+                        "login.help.register",
+                        "Tras crear la cuenta, volverás a “Iniciar sesión” automáticamente.",
+                        "After creating the account, you will return to “Sign in” automatically."
+                      )}
                 </p>
 
                 <form onSubmit={handleAuthSubmit} className="grid gap-3">
                   <Input
-                    label="Email"
+                    label={tv("login.email.label", "Email", "Email")}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="tuemail@ejemplo.com"
+                    placeholder={tv("login.email.placeholder", "tuemail@ejemplo.com", "you@example.com")}
                   />
 
                   <Input
-                    label="Contraseña (mín. 6)"
+                    label={tv("login.password.label", "Contraseña (mín. 6)", "Password (min. 6)")}
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -198,7 +236,11 @@ export default function Login() {
 
                   <div className="pt-1">
                     <Button type="submit" disabled={busy} className="w-full">
-                      {busy ? "Procesando..." : authMode === "login" ? "Entrar" : "Crear cuenta"}
+                      {busy
+                        ? tv("common.processing", "Procesando...", "Processing...")
+                        : authMode === "login"
+                        ? tv("login.submit.signIn", "Entrar", "Sign in")
+                        : tv("login.submit.create", "Crear cuenta", "Create account")}
                     </Button>
                   </div>
                 </form>

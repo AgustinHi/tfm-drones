@@ -4,14 +4,27 @@ import api from "../api";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
+import { useTranslation } from "react-i18next";
 
-function buildErrorMessage(err) {
-  if (!err?.response) return "Error de red: no se pudo contactar con el servidor.";
+function buildErrorMessage(err, tv) {
+  if (!err?.response) return tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.");
   const status = err.response.status;
-  if (status === 401) return "No autorizado (401). Tu sesión no es válida o ha caducado.";
+
+  if (status === 401) {
+    return tv(
+      "errors.unauthorized",
+      "No autorizado (401). Tu sesión no es válida o ha caducado.",
+      "Unauthorized (401). Your session is invalid or expired."
+    );
+  }
+
   const detail = err.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return `${detail} (HTTP ${status})`;
-  return `Error HTTP ${status}: ${err.response.statusText || "Error"}`;
+  return tv(
+    "errors.httpGeneric",
+    `Error HTTP ${status}: ${err.response.statusText || "Error"}`,
+    `HTTP ${status} error: ${err.response.statusText || "Error"}`
+  );
 }
 
 // Color estable por ID (golden angle)
@@ -70,7 +83,7 @@ function DroneGlyph({ color }) {
   );
 }
 
-function DroneCard({ d, loading, onView, onDelete }) {
+function DroneCard({ d, loading, onView, onDelete, labels }) {
   const accent = accentColorForId(d?.id);
 
   return (
@@ -120,15 +133,14 @@ function DroneCard({ d, loading, onView, onDelete }) {
             {d.comment ? (
               <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{d.comment}</div>
             ) : (
-              <div className="mt-1 text-sm text-muted-foreground">Sin comentario</div>
+              <div className="mt-1 text-sm text-muted-foreground">{labels.noComment}</div>
             )}
           </div>
         </div>
 
-        {/* Ajuste: menos margen al quitar el bloque inferior */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button onClick={onView} disabled={loading}>
-            Ver
+            {labels.view}
           </Button>
 
           <Button
@@ -137,7 +149,7 @@ function DroneCard({ d, loading, onView, onDelete }) {
             disabled={loading}
             className="border-destructive/30 text-destructive hover:bg-destructive/10"
           >
-            Borrar
+            {labels.delete}
           </Button>
         </div>
       </div>
@@ -147,6 +159,11 @@ function DroneCard({ d, loading, onView, onDelete }) {
 
 export default function Manage() {
   const navigate = useNavigate();
+
+  const { t, i18n } = useTranslation();
+  const isEn = (i18n.resolvedLanguage || i18n.language || "es").startsWith("en");
+  const L = (es, en) => (isEn ? en : es);
+  const tv = (key, es, en, opts = {}) => t(key, { defaultValue: L(es, en), ...opts });
 
   const [drones, setDrones] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -177,7 +194,7 @@ export default function Manage() {
       arr.sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
       setDrones(arr);
     } catch (err) {
-      setError(buildErrorMessage(err));
+      setError(buildErrorMessage(err, tv));
     } finally {
       setLoading(false);
     }
@@ -189,7 +206,7 @@ export default function Manage() {
 
     const n = newName.trim();
     const c = newComment.trim();
-    if (!n) return setError("El Nombre es obligatorio.");
+    if (!n) return setError(tv("manage.create.nameRequired", "El Nombre es obligatorio.", "Name is required."));
 
     setLoading(true);
     try {
@@ -206,9 +223,9 @@ export default function Manage() {
       setDrones((prev) => [res.data, ...prev]);
       setNewName("");
       setNewComment("");
-      setOk("Dron creado correctamente.");
+      setOk(tv("manage.create.success", "Dron creado correctamente.", "Drone created successfully."));
     } catch (err) {
-      setError(buildErrorMessage(err));
+      setError(buildErrorMessage(err, tv));
     } finally {
       setLoading(false);
     }
@@ -217,14 +234,26 @@ export default function Manage() {
   async function deleteDrone(d) {
     clearMsg();
 
-    const expected = `BORRAR #${d.id}`;
+    const expected = isEn ? `DELETE #${d.id}` : `BORRAR #${d.id}`;
     const typed = window.prompt(
-      `Para borrar este dron escribe exactamente:\n\n${expected}\n\nDron: ${d.name || "—"}`
+      tv(
+        "manage.delete.prompt",
+        "Para borrar este dron escribe exactamente:\n\n{{expected}}\n\nDron: {{name}}",
+        "To delete this drone, type exactly:\n\n{{expected}}\n\nDrone: {{name}}",
+        { expected, name: d.name || "—" }
+      )
     );
 
     if (typed == null) return;
     if (typed.trim() !== expected) {
-      setError(`Cancelado. Debes escribir exactamente: ${expected}`);
+      setError(
+        tv(
+          "manage.delete.cancelled",
+          "Cancelado. Debes escribir exactamente: {{expected}}",
+          "Cancelled. You must type exactly: {{expected}}",
+          { expected }
+        )
+      );
       return;
     }
 
@@ -232,9 +261,9 @@ export default function Manage() {
     try {
       await api.delete(`/drones/${d.id}`);
       setDrones((prev) => prev.filter((x) => x.id !== d.id));
-      setOk("Dron eliminado.");
+      setOk(tv("manage.delete.success", "Dron eliminado.", "Drone deleted."));
     } catch (err) {
-      setError(buildErrorMessage(err));
+      setError(buildErrorMessage(err, tv));
     } finally {
       setLoading(false);
     }
@@ -259,6 +288,12 @@ export default function Manage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const cardLabels = {
+    view: tv("manage.card.view", "Ver", "View"),
+    delete: tv("manage.card.delete", "Borrar", "Delete"),
+    noComment: tv("manage.card.noComment", "Sin comentario", "No notes"),
+  };
+
   return (
     <div className="grid gap-6">
       <div className="relative overflow-hidden rounded-3xl bg-white/55 p-6 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
@@ -268,27 +303,39 @@ export default function Manage() {
 
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <h1 className="text-4xl font-extrabold tracking-tight">Gestión</h1>
-            <p className="text-sm text-muted-foreground">Crear drones y gestionar tarjetas (zona privada)</p>
+            <h1 className="text-4xl font-extrabold tracking-tight">{tv("manage.title", "Gestión", "Manage")}</h1>
+            <p className="text-sm text-muted-foreground">
+              {tv("manage.subtitle", "Crear drones y gestionar tarjetas (zona privada)", "Create drones and manage cards (private area)")}
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={fetchDrones} disabled={loading}>
-              {loading ? "Cargando..." : "Recargar"}
+              {loading ? tv("common.loadingBtn", "Cargando...", "Loading...") : tv("common.reload", "Recargar", "Reload")}
             </Button>
           </div>
         </div>
 
         <div className="relative mt-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
-            <div className="text-xs text-muted-foreground">Total drones</div>
+            <div className="text-xs text-muted-foreground">{tv("manage.stats.total", "Total drones", "Total drones")}</div>
             <div className="text-2xl font-extrabold">{drones.length}</div>
           </div>
 
           <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10 sm:col-span-2">
-            <div className="text-xs text-muted-foreground">Búsqueda</div>
+            <div className="text-xs text-muted-foreground">{tv("manage.stats.searchTitle", "Búsqueda", "Search")}</div>
             <div className="text-sm text-muted-foreground">
-              Escribe <span className="font-bold text-foreground">#3</span> para filtrar por ID o texto como{" "}
+              {tv(
+                "manage.stats.searchHelp",
+                "Escribe ",
+                "Type "
+              )}
+              <span className="font-bold text-foreground">#3</span>{" "}
+              {tv(
+                "manage.stats.searchHelp2",
+                "para filtrar por ID o texto como ",
+                "to filter by ID or text like "
+              )}
               <span className="font-bold text-foreground">cinewhoop</span>.
             </div>
           </div>
@@ -300,21 +347,30 @@ export default function Manage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="grid gap-4 lg:col-span-2">
           <Card
-            title={`Drones (${filtered.length}/${drones.length})`}
+            title={tv("manage.list.title", "Drones ({{shown}}/{{total}})", "Drones ({{shown}}/{{total}})", {
+              shown: filtered.length,
+              total: drones.length,
+            })}
             className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
           >
             <div className="grid gap-4">
               <Input
-                label="Buscar"
+                label={tv("home.list.searchLabel", "Buscar", "Search")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Nombre, comentario… (ej: #3 o 'cinewhoop')"
+                placeholder={tv(
+                  "manage.list.searchPlaceholder",
+                  "Nombre, comentario… (ej: #3 o 'cinewhoop')",
+                  "Name, notes… (e.g. #3 or 'cinewhoop')"
+                )}
               />
 
               {filtered.length === 0 ? (
                 <div className="rounded-2xl bg-white/45 p-5 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
                   <p className="text-sm text-muted-foreground">
-                    {query.trim() ? "No hay resultados para esa búsqueda." : "No hay drones creados todavía."}
+                    {query.trim()
+                      ? tv("home.list.noResults", "No hay resultados para esa búsqueda.", "No results for that search.")
+                      : tv("manage.list.empty", "No hay drones creados todavía.", "No drones created yet.")}
                   </p>
                 </div>
               ) : (
@@ -324,6 +380,7 @@ export default function Manage() {
                       key={d.id}
                       d={d}
                       loading={loading}
+                      labels={cardLabels}
                       onView={() => navigate(`/drones/${d.id}`)}
                       onDelete={() => deleteDrone(d)}
                     />
@@ -335,29 +392,33 @@ export default function Manage() {
         </div>
 
         <div className="grid gap-4">
-          <Card title="Crear dron" className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+          <Card title={tv("manage.create.title", "Crear dron", "Create drone")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
             <form onSubmit={createDrone} className="grid gap-3">
               <Input
-                label="Nombre"
+                label={tv("manage.create.nameLabel", "Nombre", "Name")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Ej: Cinewhoop 2.5"
+                placeholder={tv("manage.create.namePh", "Ej: Cinewhoop 2.5", "e.g. Cinewhoop 2.5")}
                 autoComplete="off"
               />
               <Input
-                label="Comentario (opcional)"
+                label={tv("manage.create.commentLabel", "Comentario (opcional)", "Notes (optional)")}
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Ej: Setup indoor / vídeo digital…"
+                placeholder={tv("manage.create.commentPh", "Ej: Setup indoor / vídeo digital…", "e.g. Indoor setup / digital video…")}
                 autoComplete="off"
               />
 
               <Button type="submit" disabled={loading}>
-                {loading ? "Creando..." : "Crear"}
+                {loading ? tv("manage.create.creating", "Creando...", "Creating...") : tv("manage.create.submit", "Crear", "Create")}
               </Button>
 
               <div className="rounded-2xl bg-white/45 p-4 text-xs text-muted-foreground shadow-sm backdrop-blur-xl ring-1 ring-black/10">
-                Consejo: usa un nombre claro para evitar confusiones. Borrar exige confirmación estricta.
+                {tv(
+                  "manage.create.tip",
+                  "Consejo: usa un nombre claro para evitar confusiones. Borrar exige confirmación estricta.",
+                  "Tip: use a clear name to avoid confusion. Deleting requires strict confirmation."
+                )}
               </div>
             </form>
           </Card>
