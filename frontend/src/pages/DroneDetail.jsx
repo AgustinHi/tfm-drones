@@ -11,9 +11,10 @@ const CONTROLLERS = ["", "Betaflight", "Kiss"];
 const VIDEOS = ["", "Analogico", "Digital"];
 
 /**
- * Backend (según tu Swagger):
- * - GET  /drones/{drone_id}/dumps   -> listar dumps del dron
- * - POST /dumps                    -> subir dump (multipart)
+ * Backend:
+ * - GET    /drones/{drone_id}/dumps            -> listar dumps del dron
+ * - POST   /dumps                              -> subir dump (multipart)
+ * - DELETE /drones/{drone_id}/dumps/{dump_id}  -> borrar dump (registro + fichero)
  *
  * Nota: para evitar fallo por nombres de campos distintos, enviamos variantes:
  * - file + dump_file (binary)
@@ -21,6 +22,7 @@ const VIDEOS = ["", "Analogico", "Digital"];
  */
 const API_LIST_DUMPS = (droneId) => `/drones/${droneId}/dumps`;
 const API_UPLOAD_DUMP = () => `/dumps`;
+const API_DELETE_DUMP = (droneId, dumpId) => `/drones/${droneId}/dumps/${dumpId}`;
 const PARSE_ROUTE = (droneId, dumpId) => `/drones/${droneId}/dumps/${dumpId}/parse`;
 
 function accentColorForId(id) {
@@ -30,6 +32,7 @@ function accentColorForId(id) {
   return `hsl(${hue} 82% 52%)`;
 }
 
+/** Icono lineal de dron (quad) con cuerpo central relleno */
 function DroneGlyph({ color }) {
   return (
     <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none">
@@ -52,19 +55,22 @@ function DroneGlyph({ color }) {
   );
 }
 
+/**
+ * Banner SIEMPRE legible:
+ * - fondo oscuro + texto blanco (alto contraste)
+ * - barra lateral verde/roja para estado
+ */
 function MessageBanner({ msg }) {
   if (!msg?.text) return null;
   const ok = msg.type === "ok";
+
   return (
-    <div
-      className={[
-        "rounded-2xl px-4 py-3 text-sm shadow-sm backdrop-blur-xl ring-1",
-        ok
-          ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-200"
-          : "bg-destructive/10 text-destructive ring-destructive/20",
-      ].join(" ")}
-    >
-      {msg.text}
+    <div className="relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/20 bg-slate-900/85 text-white">
+      <div
+        className={["pointer-events-none absolute left-0 top-0 h-full w-[6px]", ok ? "bg-emerald-400" : "bg-rose-400"].join(" ")}
+        aria-hidden="true"
+      />
+      <div className="pl-3">{msg.text}</div>
     </div>
   );
 }
@@ -77,9 +83,7 @@ function ReadField({ label, value }) {
   return (
     <div className="grid gap-1">
       <div className="text-sm font-semibold text-muted-foreground">{label}</div>
-      <div className="rounded-xl bg-white/45 px-3 py-2 text-sm shadow-sm backdrop-blur-xl ring-1 ring-black/10">
-        {text}
-      </div>
+      <div className="rounded-xl bg-white/45 px-3 py-2 text-sm shadow-sm backdrop-blur-xl ring-1 ring-black/10">{text}</div>
     </div>
   );
 }
@@ -205,7 +209,8 @@ export default function DroneDetail() {
       setDrone(res.data);
       fillFormFromDrone(res.data);
     } catch (err) {
-      if (!err?.response) setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+      if (!err?.response)
+        setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
       else setError(err?.response?.data?.detail || tv("detail.error.loading", "Error cargando el dron.", "Error loading the drone."));
       setDrone(null);
     } finally {
@@ -213,12 +218,12 @@ export default function DroneDetail() {
     }
   }
 
-  async function fetchDumps() {
-    clearDumpMsg();
+  // IMPORTANTE: si llamas a fetchDumps() justo después de setDumpOk, NO debemos borrar el banner.
+  async function fetchDumps({ silent = false } = {}) {
+    if (!silent) clearDumpMsg();
     try {
       const res = await api.get(API_LIST_DUMPS(droneId));
       const arr = Array.isArray(res.data) ? res.data : [];
-      // robusto: created_at si existe; si no, por id desc
       arr.sort((a, b) => {
         const ad = a?.created_at ? new Date(a.created_at).getTime() : 0;
         const bd = b?.created_at ? new Date(b.created_at).getTime() : 0;
@@ -281,7 +286,8 @@ export default function DroneDetail() {
       setIsEditing(false);
       setOk(tv("detail.save.ok", "Guardado correctamente.", "Saved successfully."));
     } catch (err) {
-      if (!err?.response) setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+      if (!err?.response)
+        setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
       else setError(err?.response?.data?.detail || tv("detail.save.error", "Error guardando el dron.", "Error saving the drone."));
     } finally {
       setLoading(false);
@@ -290,7 +296,8 @@ export default function DroneDetail() {
 
   function extractApiError(err, fallback) {
     if (!err) return fallback;
-    if (!err.response) return tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.");
+    if (!err.response)
+      return tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.");
 
     const data = err.response.data;
     if (typeof data === "string" && data.trim()) return data;
@@ -299,9 +306,7 @@ export default function DroneDetail() {
     if (typeof detail === "string" && detail.trim()) return detail;
 
     if (Array.isArray(detail) && detail.length) {
-      // típico 422 de FastAPI: lista de errores
       const defaultItemMsg = tv("errors.validationItem", "Error de validación", "Validation error");
-
       const lines = detail
         .map((x) => {
           const loc = Array.isArray(x?.loc) ? x.loc.join(".") : "";
@@ -310,11 +315,7 @@ export default function DroneDetail() {
         })
         .slice(0, 6);
 
-      return tv(
-        "errors.validationList",
-        `Error de validación (422):\n${lines.join("\n")}`,
-        `Validation error (422):\n${lines.join("\n")}`
-      );
+      return tv("errors.validationList", `Error de validación (422):\n${lines.join("\n")}`, `Validation error (422):\n${lines.join("\n")}`);
     }
 
     return fallback;
@@ -333,11 +334,8 @@ export default function DroneDetail() {
       setDumpBusy(true);
 
       const fd = new FormData();
-
-      // Variantes de nombre (evita fallo si el backend usa otro campo)
       fd.append("file", dumpFile);
       fd.append("dump_file", dumpFile);
-
       fd.append("drone_id", String(droneId));
       fd.append("droneId", String(droneId));
 
@@ -348,9 +346,57 @@ export default function DroneDetail() {
       setDumpOk(tv("detail.dumps.uploadOk", "Dump subido correctamente.", "Dump uploaded successfully."));
       setDumpFile(null);
       if (dumpInputRef.current) dumpInputRef.current.value = "";
-      await fetchDumps();
+
+      await fetchDumps({ silent: true });
     } catch (err) {
       setDumpError(extractApiError(err, tv("detail.dumps.uploadError", "No se pudo subir el dump.", "Could not upload the dump.")));
+    } finally {
+      setDumpBusy(false);
+    }
+  }
+
+  async function deleteDump(dumpRow) {
+    clearDumpMsg();
+
+    const dumpId = dumpRow?.id ?? dumpRow?.dump_id ?? dumpRow?.uuid ?? dumpRow?._id ?? "";
+    if (!dumpId) {
+      setDumpError(tv("detail.dumps.delete.noId", "No se pudo identificar el dump.", "Could not identify the dump."));
+      return;
+    }
+
+    const filename = dumpRow?.original_name || dumpRow?.filename || dumpRow?.name || (dumpId ? `Dump #${dumpId}` : "Dump");
+    const expected = isEn ? `DELETE DUMP #${dumpId}` : `BORRAR DUMP #${dumpId}`;
+
+    const typed = window.prompt(
+      tv(
+        "detail.dumps.delete.prompt",
+        "Para borrar este dump escribe exactamente:\n\n{{expected}}\n\nArchivo: {{name}}",
+        "To delete this dump, type exactly:\n\n{{expected}}\n\nFile: {{name}}",
+        { expected, name: filename }
+      )
+    );
+
+    if (typed == null) return;
+    if (typed.trim() !== expected) {
+      setDumpError(
+        tv(
+          "detail.dumps.delete.cancelled",
+          "Cancelado. Debes escribir exactamente: {{expected}}",
+          "Cancelled. You must type exactly: {{expected}}",
+          { expected }
+        )
+      );
+      return;
+    }
+
+    try {
+      setDumpBusy(true);
+      await api.delete(API_DELETE_DUMP(droneId, dumpId));
+
+      setDumpOk(tv("detail.dumps.delete.ok", "Dump borrado.", "Dump deleted."));
+      await fetchDumps({ silent: true });
+    } catch (err) {
+      setDumpError(extractApiError(err, tv("detail.dumps.delete.error", "No se pudo borrar el dump.", "Could not delete the dump.")));
     } finally {
       setDumpBusy(false);
     }
@@ -387,18 +433,12 @@ export default function DroneDetail() {
       {/* Header */}
       <div className="relative overflow-hidden rounded-[22px] bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
         <div className="pointer-events-none absolute left-0 top-0 h-full w-[5px]" style={{ backgroundColor: accent, opacity: 0.75 }} />
-        <div
-          className="pointer-events-none absolute inset-x-0 top-0 h-px"
-          style={{ background: `linear-gradient(90deg, transparent, ${accent}66, transparent)` }}
-        />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accent}66, transparent)` }} />
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(70%_60%_at_50%_38%,rgba(255,255,255,0.98)_0%,rgba(255,255,255,0.78)_30%,rgba(255,255,255,0.46)_55%,rgba(0,0,0,0.10)_78%,rgba(0,0,0,0.16)_100%)]" />
         <div className="pointer-events-none absolute inset-0 bg-primary/4" />
         <div className="pointer-events-none absolute inset-[12px] rounded-[16px] ring-1 ring-black/10" />
         <div className="pointer-events-none absolute inset-[13px] rounded-[15px] ring-1 ring-white/40" />
-        <div
-          className="pointer-events-none absolute -top-12 -left-12 h-40 w-40 rounded-full blur-3xl"
-          style={{ backgroundColor: accent, opacity: 0.16 }}
-        />
+        <div className="pointer-events-none absolute -top-12 -left-12 h-40 w-40 rounded-full blur-3xl" style={{ backgroundColor: accent, opacity: 0.16 }} />
 
         <div className="pointer-events-none absolute right-4 top-4 opacity-60">
           <DroneGlyph color={accent} />
@@ -408,11 +448,7 @@ export default function DroneDetail() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1 pr-16">
               <div className="flex items-center gap-2">
-                <span
-                  className="inline-flex h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: accent, opacity: 0.85 }}
-                  aria-hidden="true"
-                />
+                <span className="inline-flex h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accent, opacity: 0.85 }} aria-hidden="true" />
                 <h1 className="text-4xl font-extrabold tracking-tight">
                   {tv("detail.header.title", "Dron #{{id}}", "Drone #{{id}}", { id: droneId })}
                 </h1>
@@ -467,11 +503,7 @@ export default function DroneDetail() {
               <Card title={tv("detail.view.title", "Vista", "View")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
                 {!hasAnyField ? (
                   <p className="text-sm text-muted-foreground">
-                    {tv(
-                      "detail.view.empty",
-                      "Este dron aún no tiene características rellenadas.",
-                      "This drone doesn't have any details filled in yet."
-                    )}
+                    {tv("detail.view.empty", "Este dron aún no tiene características rellenadas.", "This drone doesn't have any details filled in yet.")}
                   </p>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
@@ -495,17 +527,12 @@ export default function DroneDetail() {
 
                   <form onSubmit={uploadDump} className="grid gap-3">
                     <label className="grid gap-1">
-                      <span className="text-sm font-semibold text-muted-foreground">
-                        {tv("detail.dumps.uploadLabel", "Subir dump", "Upload dump")}
-                      </span>
+                      <span className="text-sm font-semibold text-muted-foreground">{tv("detail.dumps.uploadLabel", "Subir dump", "Upload dump")}</span>
                       <input
                         ref={dumpInputRef}
                         type="file"
                         onChange={(e) => setDumpFile(e.target.files?.[0] || null)}
-                        className={[
-                          "w-full rounded-xl bg-white/45 px-3 py-2 text-sm shadow-sm backdrop-blur-xl",
-                          "ring-1 ring-black/10",
-                        ].join(" ")}
+                        className={["w-full rounded-xl bg-white/45 px-3 py-2 text-sm shadow-sm backdrop-blur-xl", "ring-1 ring-black/10"].join(" ")}
                       />
                     </label>
 
@@ -514,7 +541,7 @@ export default function DroneDetail() {
                         {dumpBusy ? tv("detail.dumps.uploading", "Subiendo...", "Uploading...") : tv("detail.dumps.uploadBtn", "Subir", "Upload")}
                       </Button>
 
-                      <Button type="button" variant="outline" onClick={fetchDumps} disabled={dumpBusy}>
+                      <Button type="button" variant="outline" onClick={() => fetchDumps()} disabled={dumpBusy}>
                         {tv("detail.dumps.reload", "Recargar dumps", "Reload dumps")}
                       </Button>
                     </div>
@@ -528,7 +555,7 @@ export default function DroneDetail() {
                     <ul className="divide-y divide-black/10 rounded-2xl bg-white/45 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
                       {dumps.map((x) => {
                         const dumpId = x?.id ?? x?.dump_id ?? x?.uuid ?? x?._id ?? "";
-                        const filename = x?.filename || x?.name || (dumpId ? `Dump #${dumpId}` : "Dump");
+                        const filename = x?.original_name || x?.filename || x?.name || (dumpId ? `Dump #${dumpId}` : "Dump");
                         const created = x?.created_at ? new Date(x.created_at).toLocaleString() : null;
 
                         return (
@@ -540,8 +567,17 @@ export default function DroneDetail() {
                               </div>
 
                               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                <Button onClick={() => navigate(PARSE_ROUTE(droneId, dumpId))} disabled={!dumpId}>
+                                <Button onClick={() => navigate(PARSE_ROUTE(droneId, dumpId))} disabled={!dumpId || dumpBusy}>
                                   {tv("detail.dumps.parse", "Parsear", "Parse")}
+                                </Button>
+
+                                <Button
+                                  variant="outline"
+                                  onClick={() => deleteDump(x)}
+                                  disabled={!dumpId || dumpBusy}
+                                  className="border-rose-400/40 text-rose-600 hover:bg-rose-500/10"
+                                >
+                                  {tv("detail.dumps.delete", "Borrar", "Delete")}
                                 </Button>
                               </div>
                             </div>
@@ -555,10 +591,7 @@ export default function DroneDetail() {
             </>
           ) : (
             /* Editar (sin dumps) */
-            <Card
-              title={tv("detail.edit.title", "Editar características", "Edit details")}
-              className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-            >
+            <Card title={tv("detail.edit.title", "Editar características", "Edit details")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
               <div className="grid gap-4 md:grid-cols-2">
                 <Input
                   label={tv("detail.fields.name", "Nombre", "Name")}
