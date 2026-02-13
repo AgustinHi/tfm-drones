@@ -1,3 +1,4 @@
+// frontend/src/pages/Manage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
@@ -7,19 +8,34 @@ import Input from "../ui/Input";
 import { useTranslation } from "react-i18next";
 
 function buildErrorMessage(err, tv) {
-  if (!err?.response) return tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.");
+  // Axios timeout (api.js timeout: 15000ms)
+  if (err?.code === "ECONNABORTED") {
+    return tv(
+      "errors.timeout",
+      "Tiempo de espera agotado (15s). El servidor tardó demasiado en responder.",
+      "Request timed out (15s). The server took too long to respond."
+    );
+  }
+
+  // Sin response => red caída, CORS, backend apagado, DNS, etc.
+  if (!err?.response) {
+    return tv(
+      "errors.network",
+      "Error de red: no se pudo contactar con el servidor.",
+      "Network error: could not reach the server."
+    );
+  }
+
   const status = err.response.status;
 
+  // 401 se gestiona en el interceptor (api.js): logout + redirect
   if (status === 401) {
-    return tv(
-      "errors.unauthorized",
-      "No autorizado (401). Tu sesión no es válida o ha caducado.",
-      "Unauthorized (401). Your session is invalid or expired."
-    );
+    return ""; // evitamos “flash” de mensaje antes del redirect
   }
 
   const detail = err.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return `${detail} (HTTP ${status})`;
+
   return tv(
     "errors.httpGeneric",
     `Error HTTP ${status}: ${err.response.statusText || "Error"}`,
@@ -176,10 +192,10 @@ export default function Manage() {
   const [msg, setMsg] = useState({ type: "", text: "" });
 
   function setError(text) {
-    setMsg({ type: "error", text });
+    if (text) setMsg({ type: "error", text });
   }
   function setOk(text) {
-    setMsg({ type: "ok", text });
+    if (text) setMsg({ type: "ok", text });
   }
   function clearMsg() {
     setMsg({ type: "", text: "" });
@@ -194,6 +210,9 @@ export default function Manage() {
       arr.sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
       setDrones(arr);
     } catch (err) {
+      // 401: el interceptor ya hace logout + redirect
+      if (err?.response?.status === 401) return;
+
       setError(buildErrorMessage(err, tv));
     } finally {
       setLoading(false);
@@ -225,6 +244,9 @@ export default function Manage() {
       setNewComment("");
       setOk(tv("manage.create.success", "Dron creado correctamente.", "Drone created successfully."));
     } catch (err) {
+      // 401: el interceptor ya hace logout + redirect
+      if (err?.response?.status === 401) return;
+
       setError(buildErrorMessage(err, tv));
     } finally {
       setLoading(false);
@@ -263,6 +285,9 @@ export default function Manage() {
       setDrones((prev) => prev.filter((x) => x.id !== d.id));
       setOk(tv("manage.delete.success", "Dron eliminado.", "Drone deleted."));
     } catch (err) {
+      // 401: el interceptor ya hace logout + redirect
+      if (err?.response?.status === 401) return;
+
       setError(buildErrorMessage(err, tv));
     } finally {
       setLoading(false);
@@ -325,17 +350,9 @@ export default function Manage() {
           <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10 sm:col-span-2">
             <div className="text-xs text-muted-foreground">{tv("manage.stats.searchTitle", "Búsqueda", "Search")}</div>
             <div className="text-sm text-muted-foreground">
-              {tv(
-                "manage.stats.searchHelp",
-                "Escribe ",
-                "Type "
-              )}
+              {tv("manage.stats.searchHelp", "Escribe ", "Type ")}
               <span className="font-bold text-foreground">#3</span>{" "}
-              {tv(
-                "manage.stats.searchHelp2",
-                "para filtrar por ID o texto como ",
-                "to filter by ID or text like "
-              )}
+              {tv("manage.stats.searchHelp2", "para filtrar por ID o texto como ", "to filter by ID or text like ")}
               <span className="font-bold text-foreground">cinewhoop</span>.
             </div>
           </div>
@@ -392,7 +409,10 @@ export default function Manage() {
         </div>
 
         <div className="grid gap-4">
-          <Card title={tv("manage.create.title", "Crear dron", "Create drone")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+          <Card
+            title={tv("manage.create.title", "Crear dron", "Create drone")}
+            className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
+          >
             <form onSubmit={createDrone} className="grid gap-3">
               <Input
                 label={tv("manage.create.nameLabel", "Nombre", "Name")}

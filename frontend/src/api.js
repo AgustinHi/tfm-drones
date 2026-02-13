@@ -5,8 +5,7 @@ import axios from "axios";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 const TOKEN_KEY = "tfm_token";
 const SESSION_MSG_KEY = "tfm_session_msg";
-
-let isRedirectingToLogin = false;
+const IS_DEV = Boolean(import.meta.env.DEV);
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -20,13 +19,49 @@ function logoutAndRedirectToLogin(message = "Sesión caducada. Inicia sesión de
   localStorage.removeItem(TOKEN_KEY);
   setSessionMessage(message);
 
-  if (isRedirectingToLogin) return;
-  isRedirectingToLogin = true;
-
   // Evita bucles si ya estás en /login
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
-  }
+  if (window.location.pathname === "/login") return;
+
+  // Redirección “dura” y sin historial (evita volver atrás a /manage con sesión inválida)
+  window.location.replace("/login");
+}
+
+/**
+ * En DEV, si el backend cae, el proxy de Vite suele devolver 500/502/503/504.
+ * Lo tratamos como "error de red" (sin response) para que la UI no lo pinte como HTTP 500 real.
+ */
+function isDevProxyBackendDown(error) {
+  if (!IS_DEV) return false;
+
+  const baseURL = error?.config?.baseURL;
+  // Solo cuando usamos el proxy "/api"
+  if (!(baseURL === "/api" || API_BASE === "/api")) return false;
+
+  const status = error?.response?.status;
+  if (![500, 502, 503, 504].includes(status)) return false;
+
+  const headers = error?.response?.headers || {};
+  const ctRaw = headers["content-type"] || headers["Content-Type"] || "";
+  const ct = String(ctRaw).toLowerCase();
+
+  const data = error?.response?.data;
+  const body = typeof data === "string" ? data.toLowerCase() : "";
+
+  // El backend FastAPI suele devolver JSON; el proxy de Vite suele devolver HTML o texto plano.
+  const looksHtml = ct.includes("text/html") || body.includes("<!doctype html") || body.includes("<html");
+  const looksPlain = ct.includes("text/plain");
+  const notJson = !ct.includes("application/json");
+
+  // Mensajes típicos del proxy cuando no puede conectar
+  const msg = `${body} ${error?.message || ""}`.toLowerCase();
+  const hasProxyHints =
+    msg.includes("econnrefused") ||
+    msg.includes("socket hang up") ||
+    msg.includes("proxy error") ||
+    msg.includes("could not proxy") ||
+    (msg.includes("connect") && msg.includes("refused"));
+
+  return (notJson && (looksHtml || looksPlain)) || hasProxyHints;
 }
 
 const api = axios.create({
@@ -59,10 +94,14 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // DEV proxy cuando el backend está caído: forzamos "sin response" para que Manage lo trate como red
+    if (isDevProxyBackendDown(error)) {
+      error.response = undefined;
+      return Promise.reject(error);
+    }
+
     // Sin response => red caída, CORS, backend apagado, DNS, etc.
     if (!error?.response) {
-      // Dejamos que la UI muestre un mensaje “de red”
-      // (Manage.jsx lo distinguirá con error.request o !error.response)
       return Promise.reject(error);
     }
 

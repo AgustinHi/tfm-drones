@@ -1,3 +1,4 @@
+# backend/models.py
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import Enum as SAEnum
@@ -10,6 +11,9 @@ class Drone(Base):
     __tablename__ = "drones"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    # PROPIETARIO (para filtrar por usuario)
+    owner_email = Column(String(255), nullable=False, index=True, default="")
 
     # Campos “tarjeta”
     name = Column(String(120), nullable=False, default="")
