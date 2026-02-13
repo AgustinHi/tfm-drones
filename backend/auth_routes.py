@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
+
+import jwt  # PyJWT
+from jwt import InvalidTokenError
 
 from db import engine
 from auth import (
@@ -41,8 +43,13 @@ def get_current_user_email(authorization: str | None = Header(default=None)) -> 
     token = authorization.split(" ", 1)[1].strip()
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-    except JWTError:
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALG],
+            options={"require": ["exp", "sub"]},
+        )
+    except InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",

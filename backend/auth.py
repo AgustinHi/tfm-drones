@@ -1,8 +1,9 @@
+# backend/auth.py
 import os
 from datetime import datetime, timedelta
 
+import jwt  # PyJWT
 from dotenv import load_dotenv
-from jose import jwt
 from passlib.context import CryptContext
 
 load_dotenv()
@@ -31,4 +32,5 @@ def create_access_token(subject: str) -> str:
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }
+    # PyJWT devuelve un str en v2.x
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
