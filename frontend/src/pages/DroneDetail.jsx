@@ -5,6 +5,7 @@ import api from "../api";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
+import MessageBanner from "../ui/MessageBanner";
 import { useTranslation } from "react-i18next";
 
 const CONTROLLERS = ["", "Betaflight", "Kiss"];
@@ -52,26 +53,6 @@ function DroneGlyph({ color }) {
         <path d="M12 13.8v1" />
       </g>
     </svg>
-  );
-}
-
-/**
- * Banner SIEMPRE legible:
- * - fondo oscuro + texto blanco (alto contraste)
- * - barra lateral verde/roja para estado
- */
-function MessageBanner({ msg }) {
-  if (!msg?.text) return null;
-  const ok = msg.type === "ok";
-
-  return (
-    <div className="relative overflow-hidden rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm ring-1 ring-black/20 bg-slate-900/85 text-white">
-      <div
-        className={["pointer-events-none absolute left-0 top-0 h-full w-[6px]", ok ? "bg-emerald-400" : "bg-rose-400"].join(" ")}
-        aria-hidden="true"
-      />
-      <div className="pl-3">{msg.text}</div>
-    </div>
   );
 }
 

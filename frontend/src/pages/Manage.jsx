@@ -5,6 +5,7 @@ import api from "../api";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
+import MessageBanner from "../ui/MessageBanner";
 import { useTranslation } from "react-i18next";
 
 function buildErrorMessage(err, tv) {
@@ -49,24 +50,6 @@ function accentColorForId(id) {
   const base = Number.isFinite(n) ? n : 0;
   const hue = (base * 137.508) % 360;
   return `hsl(${hue} 82% 52%)`;
-}
-
-function MessageBanner({ msg }) {
-  if (!msg?.text) return null;
-  const ok = msg.type === "ok";
-
-  return (
-    <div
-      className={[
-        "rounded-2xl px-4 py-3 text-sm shadow-sm backdrop-blur-xl ring-1",
-        ok
-          ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-200"
-          : "bg-destructive/10 text-destructive ring-destructive/20",
-      ].join(" ")}
-    >
-      {msg.text}
-    </div>
-  );
 }
 
 /** Icono lineal de dron (quad) con cuerpo central relleno */

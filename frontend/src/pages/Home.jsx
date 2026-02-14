@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+// frontend/src/pages/Home.jsx
 import { useNavigate } from "react-router-dom";
-import api from "../api";
 import { isLoggedIn, clearToken } from "../auth";
 import Button from "../ui/Button";
-import Card from "../ui/Card";
-import Input from "../ui/Input";
 import { useTranslation } from "react-i18next";
 
 export default function Home() {
@@ -15,83 +12,10 @@ export default function Home() {
   const isEn = (i18n.resolvedLanguage || i18n.language || "es").startsWith("en");
   const L = (es, en) => (isEn ? en : es);
 
-  const [drones, setDrones] = useState([]);
-  const [query, setQuery] = useState("");
-
-  // Importante: si NO estás logueado, Home no llama al backend (evita 401 + redirect)
-  const [infoMsg, setInfoMsg] = useState(
-    loggedIn
-      ? ""
-      : t("home.info.loginToSeeList", {
-          defaultValue: L("Inicia sesión para ver el listado de drones.", "Sign in to see your drone list."),
-        })
-  );
-  const [loading, setLoading] = useState(false);
-
   const logout = () => {
     clearToken();
     navigate("/");
   };
-
-  useEffect(() => {
-    let alive = true;
-
-    // Home pública: si no hay sesión, no pedimos /drones
-    if (!loggedIn) {
-      setDrones([]);
-      setLoading(false);
-      setInfoMsg(
-        t("home.info.loginToSeeList", {
-          defaultValue: L("Inicia sesión para ver el listado de drones.", "Sign in to see your drone list."),
-        })
-      );
-      return () => {
-        alive = false;
-      };
-    }
-
-    (async () => {
-      setLoading(true);
-      setInfoMsg("");
-      try {
-        const res = await api.get("/drones");
-        if (!alive) return;
-
-        const arr = Array.isArray(res.data) ? res.data : [];
-        arr.sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
-        setDrones(arr);
-      } catch {
-        if (!alive) return;
-        setDrones([]);
-        setInfoMsg(
-          t("home.info.couldNotLoad", {
-            defaultValue: L("No se pudo cargar el listado.", "Could not load the list."),
-          })
-        );
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedIn, i18n.resolvedLanguage]);
-
-  const filtered = useMemo(() => {
-    const raw = query.trim().toLowerCase();
-    const q = raw.startsWith("#") ? raw.slice(1).trim() : raw;
-
-    const base = [...drones];
-    if (!q) return base;
-
-    return base.filter((d) => {
-      const idText = String(d.id ?? "");
-      const text = `${idText} ${d.name ?? ""} ${d.comment ?? ""} ${d.controller ?? ""} ${d.video ?? ""}`.toLowerCase();
-      return text.includes(q);
-    });
-  }, [drones, query]);
 
   return (
     <div className="grid gap-6">
@@ -154,8 +78,8 @@ export default function Home() {
                 {t("home.security.tipPrefix", { defaultValue: L("Consejo:", "Tip:") })}{" "}
                 {t("home.security.tip", {
                   defaultValue: L(
-                    "en el listado puedes buscar por texto o #id.",
-                    "in the list you can search by text or #id."
+                    "entra en Gestión para ver y administrar tus drones.",
+                    "go to Manage to view and manage your drones."
                   ),
                 })}
               </div>
@@ -306,55 +230,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Listado: SOLO si hay sesión */}
-      {loggedIn ? (
-        <Card title={t("home.list.title", { defaultValue: L("Listado (solo lectura)", "List (read-only)") })} className="bg-white shadow-xl ring-1 ring-black/10">
-          <div className="grid gap-4">
-            <Input
-              label={t("home.list.searchLabel", { defaultValue: L("Buscar", "Search") })}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("home.list.searchPlaceholder", {
-                defaultValue: L("Nombre, comentario… (ej: cinewhoop o #1)", "Name, notes… (e.g. cinewhoop or #1)"),
-              })}
-            />
-
-            {infoMsg ? (
-              <div className="rounded-2xl bg-white px-4 py-3 text-sm text-muted-foreground shadow-sm ring-1 ring-black/10">{infoMsg}</div>
-            ) : null}
-
-            {loading ? (
-              <p className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: L("Cargando…", "Loading…") })}</p>
-            ) : filtered.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {query.trim()
-                  ? t("home.list.noResults", { defaultValue: L("No hay resultados para esa búsqueda.", "No results for that search.") })
-                  : t("home.list.noDrones", { defaultValue: L("No hay drones para mostrar.", "No drones to display.") })}
-              </p>
-            ) : (
-              <ul className="divide-y divide-black/10 rounded-2xl bg-white shadow-sm ring-1 ring-black/10">
-                {filtered.map((d) => (
-                  <li key={d.id} className="px-4 py-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="truncate text-base font-extrabold">{d.name || "—"}</div>
-                        <div className="mt-0.5 text-sm text-muted-foreground">
-                          {d.comment
-                            ? d.comment
-                            : t("home.list.noComment", { defaultValue: L("Sin comentario", "No notes") })}
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-sm font-semibold text-muted-foreground">#{d.id}</div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </Card>
-      ) : null}
     </div>
   );
 }

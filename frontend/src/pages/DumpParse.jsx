@@ -5,6 +5,7 @@ import api from "../api";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Input from "../ui/Input";
+import MessageBanner from "../ui/MessageBanner";
 import { useTranslation } from "react-i18next";
 
 const EMPTY_OBJ = Object.freeze({});
@@ -15,23 +16,6 @@ function Chip({ children }) {
     <span className="inline-flex items-center rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
       {children}
     </span>
-  );
-}
-
-function MessageBanner({ type, text }) {
-  if (!text) return null;
-  const ok = type === "ok";
-  return (
-    <div
-      className={[
-        "rounded-2xl px-4 py-3 text-sm shadow-sm backdrop-blur-xl ring-1 whitespace-pre-wrap",
-        ok
-          ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-200"
-          : "bg-destructive/10 text-destructive ring-destructive/20",
-      ].join(" ")}
-    >
-      {text}
-    </div>
   );
 }
 
@@ -222,18 +206,12 @@ function RatesChart({ axes, title, hint }) {
     return Number.isFinite(m) && m > 0 ? m : 1;
   }, [axes]);
 
-  const rollPath = useMemo(
-    () => svgPathFromPoints(axes?.roll?.curve || EMPTY_ARR, w, h, pad, maxY),
-    [axes, maxY]
-  );
+  const rollPath = useMemo(() => svgPathFromPoints(axes?.roll?.curve || EMPTY_ARR, w, h, pad, maxY), [axes, maxY]);
   const pitchPath = useMemo(
     () => svgPathFromPoints(axes?.pitch?.curve || EMPTY_ARR, w, h, pad, maxY),
     [axes, maxY]
   );
-  const yawPath = useMemo(
-    () => svgPathFromPoints(axes?.yaw?.curve || EMPTY_ARR, w, h, pad, maxY),
-    [axes, maxY]
-  );
+  const yawPath = useMemo(() => svgPathFromPoints(axes?.yaw?.curve || EMPTY_ARR, w, h, pad, maxY), [axes, maxY]);
 
   return (
     <div className="grid gap-3">
@@ -271,9 +249,7 @@ function RatesChart({ axes, title, hint }) {
             />
           </g>
 
-          {/* curves
-              Nota: roll/pitch/yaw pueden coincidir EXACTAMENTE (mismos rates) -> solo verías la última.
-              Para evitarlo y que se vean las 3, pitch y yaw van con dash patterns (tipo "overlay"). */}
+          {/* curves */}
           <path
             d={rollPath}
             fill="none"
@@ -370,11 +346,7 @@ export default function DumpParse() {
     (err, fallback) => {
       if (!err) return fallback;
       if (!err.response)
-        return tv(
-          "errors.network",
-          "Error de red: no se pudo contactar con el servidor.",
-          "Network error: could not reach the server."
-        );
+        return tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.");
       const data = err.response.data;
       if (typeof data === "string" && data.trim()) return data;
       const detail = data?.detail;
@@ -544,8 +516,7 @@ export default function DumpParse() {
 
   const mergedScopedSettings = useMemo(() => {
     const a = profileGroupSettings && typeof profileGroupSettings === "object" ? profileGroupSettings : EMPTY_OBJ;
-    const b =
-      rateProfileGroupSettings && typeof rateProfileGroupSettings === "object" ? rateProfileGroupSettings : EMPTY_OBJ;
+    const b = rateProfileGroupSettings && typeof rateProfileGroupSettings === "object" ? rateProfileGroupSettings : EMPTY_OBJ;
     return { ...a, ...b };
   }, [profileGroupSettings, rateProfileGroupSettings]);
 
@@ -569,12 +540,7 @@ export default function DumpParse() {
     let any = false;
 
     for (const ax of axes) {
-      const rc = pickNumber(mergedScopedSettings, [
-        `${ax}_rc_rate`,
-        `rc_rate_${ax}`,
-        `${ax}rc_rate`,
-        `${ax}_rcRate`,
-      ]);
+      const rc = pickNumber(mergedScopedSettings, [`${ax}_rc_rate`, `rc_rate_${ax}`, `${ax}rc_rate`, `${ax}_rcRate`]);
 
       const sr = pickNumber(mergedScopedSettings, [
         `${ax}_srate`,
@@ -655,23 +621,7 @@ export default function DumpParse() {
 
             <div className="flex flex-wrap items-center gap-2">
               <Chip>{tv("dumpParse.chips.drone", "Dron #{{id}}", "Drone #{{id}}", { id: droneId })}</Chip>
-              <Chip>
-                {tv(
-                  "dumpParse.chips.interpretation",
-                  "Interpretación (estilo Betaflight)",
-                  "Interpretation (Betaflight-like)"
-                )}
-              </Chip>
-              <Chip>{tv("dumpParse.chips.readonly", "solo lectura", "read-only")}</Chip>
             </div>
-
-            <p className="text-sm text-muted-foreground">
-              {tv(
-                "dumpParse.subtitle",
-                "Esta pantalla carga el dump del backend y muestra secciones con tablas (más parecido a Betaflight).",
-                "This screen loads the dump from the backend and shows sections with tables (more Betaflight-like)."
-              )}
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -740,15 +690,12 @@ export default function DumpParse() {
         </div>
       </div>
 
-      <MessageBanner type={banner.type} text={banner.text} />
+      <MessageBanner msg={banner} />
 
       {/* Content */}
       {activeTab === "summary" ? (
         <div className="grid gap-6">
-          <Card
-            title={tv("dumpParse.cards.status", "Estado", "Status")}
-            className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-          >
+          <Card title={tv("dumpParse.cards.status", "Estado", "Status")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
             <div className="grid gap-4">
               <div className="grid gap-3 sm:grid-cols-3">
                 <StatCard
@@ -759,11 +706,7 @@ export default function DumpParse() {
                 <StatCard
                   label={tv("dumpParse.stats.recognized", "Reconocidas", "Recognized")}
                   value={stats?.recognized ?? "—"}
-                  sub={tv(
-                    "dumpParse.stats.recognizedHint",
-                    "Progreso de reconocimiento aproximado.",
-                    "Approximate recognition progress."
-                  )}
+                  sub={tv("dumpParse.stats.recognizedHint", "Progreso de reconocimiento aproximado.", "Approximate recognition progress.")}
                   progressValue={recognizedRatio}
                 />
                 <StatCard
@@ -786,10 +729,7 @@ export default function DumpParse() {
             </div>
           </Card>
 
-          <Card
-            title={tv("dumpParse.cards.firmware", "FC / Firmware", "FC / Firmware")}
-            className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-          >
+          <Card title={tv("dumpParse.cards.firmware", "FC / Firmware", "FC / Firmware")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
             <KeyValueList
               data={{
                 version: firmware?.version_line ?? "",
@@ -803,10 +743,7 @@ export default function DumpParse() {
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card
-              title={tv("dumpParse.cards.ports", "Ports / Serial", "Ports / Serial")}
-              className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-            >
+            <Card title={tv("dumpParse.cards.ports", "Ports / Serial", "Ports / Serial")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
               <SimpleTable
                 columns={[
                   { key: "port", label: "port" },
@@ -825,10 +762,7 @@ export default function DumpParse() {
               </div>
             </Card>
 
-            <Card
-              title={tv("dumpParse.cards.modes", "Modes / AUX", "Modes / AUX")}
-              className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-            >
+            <Card title={tv("dumpParse.cards.modes", "Modes / AUX", "Modes / AUX")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
               <SimpleTable
                 columns={[
                   { key: "mode", label: "modeId" },
@@ -849,10 +783,7 @@ export default function DumpParse() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card
-              title={tv("dumpParse.cards.features", "Features", "Features")}
-              className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-            >
+            <Card title={tv("dumpParse.cards.features", "Features", "Features")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
               <div className="grid gap-3">
                 <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
                   <div className="text-xs text-muted-foreground">{tv("dumpParse.features.enabled", "Activadas", "Enabled")}</div>
@@ -878,10 +809,7 @@ export default function DumpParse() {
               </div>
             </Card>
 
-            <Card
-              title={tv("dumpParse.cards.resources", "Resources", "Resources")}
-              className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
-            >
+            <Card title={tv("dumpParse.cards.resources", "Resources", "Resources")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
               <SimpleTable
                 columns={[
                   { key: "type", label: "type" },
@@ -921,11 +849,7 @@ export default function DumpParse() {
                 <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
                   <div className="text-sm font-extrabold">{tv("dumpParse.settings.global", "Global", "Global")}</div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    {tv(
-                      "dumpParse.settings.globalHint",
-                      "Mapa de 'set key = value' (filtrado por el buscador).",
-                      "Map of 'set key = value' (filtered by the search)."
-                    )}
+                    {tv("dumpParse.settings.globalHint", "Mapa de 'set key = value' (filtrado por el buscador).", "Map of 'set key = value' (filtered by the search).")}
                   </div>
 
                   <div className="mt-3">
@@ -938,9 +862,7 @@ export default function DumpParse() {
                       emptyLabel={tv("dumpParse.empty.settings", "No hay ajustes detectados.", "No settings detected.")}
                     />
                     {globalRows.length > 220 ? (
-                      <div className="mt-2 text-xs text-muted-foreground">
-                        + {globalRows.length - 220} más (limitado para no romper el layout)
-                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">+ {globalRows.length - 220} más (limitado para no romper el layout)</div>
                     ) : null}
                   </div>
                 </div>
@@ -948,18 +870,12 @@ export default function DumpParse() {
                 <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
                   <div className="text-sm font-extrabold">{tv("dumpParse.settings.scoped", "Por perfiles", "By profiles")}</div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    {tv(
-                      "dumpParse.settings.scopedHint",
-                      "Selecciona profile/rateprofile y categoría para ver tablas.",
-                      "Select profile/rateprofile and category to view tables."
-                    )}
+                    {tv("dumpParse.settings.scopedHint", "Selecciona profile/rateprofile y categoría para ver tablas.", "Select profile/rateprofile and category to view tables.")}
                   </div>
 
                   <div className="mt-4 grid gap-3">
                     <label className="grid gap-1">
-                      <span className="text-sm font-semibold text-muted-foreground">
-                        {tv("dumpParse.settings.group", "Categoría", "Category")}
-                      </span>
+                      <span className="text-sm font-semibold text-muted-foreground">{tv("dumpParse.settings.group", "Categoría", "Category")}</span>
                       <select
                         value={selectedGroup}
                         onChange={(e) => setSelectedGroup(e.target.value)}
@@ -1047,9 +963,7 @@ export default function DumpParse() {
                             />
 
                             <div className="grid gap-2">
-                              <div className="text-sm font-extrabold">
-                                {tv("dumpParse.rates.tableTitle", "Tabla (tipo Betaflight)", "Table (Betaflight-like)")}
-                              </div>
+                              <div className="text-sm font-extrabold">{tv("dumpParse.rates.tableTitle", "Tabla (tipo Betaflight)", "Table (Betaflight-like)")}</div>
 
                               <SimpleTable
                                 columns={[
@@ -1079,9 +993,7 @@ export default function DumpParse() {
 
                     <div className="grid gap-3">
                       <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
-                        <div className="text-xs text-muted-foreground">
-                          {tv("dumpParse.settings.profileView", "profile (PID y varios)", "profile (PID and others)")}
-                        </div>
+                        <div className="text-xs text-muted-foreground">{tv("dumpParse.settings.profileView", "profile (PID y varios)", "profile (PID and others)")}</div>
                         <div className="mt-2">
                           <SimpleTable
                             columns={[
@@ -1089,19 +1001,13 @@ export default function DumpParse() {
                               { key: "value", label: "value" },
                             ]}
                             rows={profileRows.slice(0, 180)}
-                            emptyLabel={tv(
-                              "dumpParse.empty.profileGroup",
-                              "No hay valores en este profile/grupo.",
-                              "No values for this profile/group."
-                            )}
+                            emptyLabel={tv("dumpParse.empty.profileGroup", "No hay valores en este profile/grupo.", "No values for this profile/group.")}
                           />
                         </div>
                       </div>
 
                       <div className="rounded-2xl bg-white/45 p-4 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
-                        <div className="text-xs text-muted-foreground">
-                          {tv("dumpParse.settings.rateProfileView", "rateprofile (rates y varios)", "rateprofile (rates and others)")}
-                        </div>
+                        <div className="text-xs text-muted-foreground">{tv("dumpParse.settings.rateProfileView", "rateprofile (rates y varios)", "rateprofile (rates and others)")}</div>
                         <div className="mt-2">
                           <SimpleTable
                             columns={[
@@ -1109,11 +1015,7 @@ export default function DumpParse() {
                               { key: "value", label: "value" },
                             ]}
                             rows={rateProfileRows.slice(0, 180)}
-                            emptyLabel={tv(
-                              "dumpParse.empty.rateProfileGroup",
-                              "No hay valores en este rateprofile/grupo.",
-                              "No values for this rateprofile/group."
-                            )}
+                            emptyLabel={tv("dumpParse.empty.rateProfileGroup", "No hay valores en este rateprofile/grupo.", "No values for this rateprofile/group.")}
                           />
                         </div>
                       </div>
@@ -1136,7 +1038,10 @@ export default function DumpParse() {
       ) : null}
 
       {activeTab === "raw" ? (
-        <Card title={tv("dumpParse.cards.raw", "Respuesta JSON (debug)", "JSON response (debug)")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+        <Card
+          title={tv("dumpParse.cards.raw", "Respuesta JSON (debug)", "JSON response (debug)")}
+          className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10"
+        >
           <div className="grid gap-3">
             <div className="text-sm text-muted-foreground">
               {tv(
