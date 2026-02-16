@@ -1,14 +1,14 @@
 // frontend/src/api.js
 import axios from "axios";
+import { getToken as getStoredToken, clearToken as clearStoredToken } from "./auth";
 
 // Usamos proxy de Vite (/api) para evitar CORS + preflight
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
-const TOKEN_KEY = "tfm_token";
 const SESSION_MSG_KEY = "tfm_session_msg";
 const IS_DEV = Boolean(import.meta.env.DEV);
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || "";
+  return getStoredToken() || "";
 }
 
 function setSessionMessage(text) {
@@ -16,7 +16,7 @@ function setSessionMessage(text) {
 }
 
 function logoutAndRedirectToLogin(message = "Sesión caducada. Inicia sesión de nuevo.") {
-  localStorage.removeItem(TOKEN_KEY);
+  clearStoredToken();
   setSessionMessage(message);
 
   // Evita bucles si ya estás en /login
@@ -110,11 +110,4 @@ api.interceptors.response.use(
 );
 
 export default api;
-export {
-  API_BASE,
-  TOKEN_KEY,
-  SESSION_MSG_KEY,
-  getToken,
-  setSessionMessage,
-  logoutAndRedirectToLogin,
-};
+export { API_BASE, SESSION_MSG_KEY, getToken, setSessionMessage, logoutAndRedirectToLogin };

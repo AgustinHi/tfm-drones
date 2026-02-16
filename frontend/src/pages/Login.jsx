@@ -1,3 +1,4 @@
+// frontend/src/pages/Login.jsx
 import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import api, { SESSION_MSG_KEY } from "../api";
@@ -10,11 +11,31 @@ import { useTranslation } from "react-i18next";
 const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 const isValidPassword = (v) => v.trim().length >= 6;
 
+function getSafeRedirectTarget(candidate) {
+  // React Router puede pasar string o un location-like object
+  const raw = typeof candidate === "string" ? candidate : candidate?.pathname;
+
+  if (typeof raw !== "string") return "/manage";
+
+  // Solo permitimos rutas internas (evita http(s)://, //, javascript:, etc.)
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("/")) return "/manage";
+  if (trimmed.startsWith("//")) return "/manage";
+  if (trimmed.toLowerCase().startsWith("/\\") || trimmed.includes("://")) return "/manage";
+
+  // Whitelist mínima (ajusta si añades más rutas públicas)
+  const basePath = trimmed.split("?")[0].split("#")[0];
+  const allowed = new Set(["/", "/manage"]);
+  if (!allowed.has(basePath)) return "/manage";
+
+  return trimmed;
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from || "/manage";
+  const from = getSafeRedirectTarget(location.state?.from);
   const reason = location.state?.reason || null;
 
   const { t, i18n } = useTranslation();
@@ -89,7 +110,9 @@ export default function Login() {
         const res = await api.post("/auth/register", { email: eVal, password: pVal });
         if (res.data?.error) return setAuthError(res.data.error);
 
-        setAuthSuccess(tv("login.register.success", "Cuenta creada. Ahora puedes iniciar sesión.", "Account created. You can now sign in."));
+        setAuthSuccess(
+          tv("login.register.success", "Cuenta creada. Ahora puedes iniciar sesión.", "Account created. You can now sign in.")
+        );
         setAuthMode("login");
         return;
       }
@@ -108,17 +131,18 @@ export default function Login() {
     }
   };
 
-  const banner = authError || authSuccess ? (
-    <div
-      className={[
-        "rounded-2xl px-4 py-3 text-sm shadow-sm backdrop-blur",
-        "ring-1 ring-black/10",
-        authError ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
-      ].join(" ")}
-    >
-      {authError || authSuccess}
-    </div>
-  ) : null;
+  const banner =
+    authError || authSuccess ? (
+      <div
+        className={[
+          "rounded-2xl px-4 py-3 text-sm shadow-sm backdrop-blur",
+          "ring-1 ring-black/10",
+          authError ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+        ].join(" ")}
+      >
+        {authError || authSuccess}
+      </div>
+    ) : null;
 
   return (
     <div className="grid gap-6">
@@ -142,7 +166,9 @@ export default function Login() {
                 </div>
               </div>
 
-              <h1 className="text-3xl font-extrabold tracking-tight">{tv("login.title", "Inicia sesión para continuar", "Sign in to continue")}</h1>
+              <h1 className="text-3xl font-extrabold tracking-tight">
+                {tv("login.title", "Inicia sesión para continuar", "Sign in to continue")}
+              </h1>
               <p className="text-sm text-muted-foreground">
                 {tv(
                   "login.subtitle",
