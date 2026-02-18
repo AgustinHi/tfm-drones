@@ -8,20 +8,47 @@ import DumpParse from "./pages/DumpParse";
 import Login from "./pages/Login";
 import RequireAuthToLogin from "./RequireAuthToLogin";
 import AppLayout from "./layouts/AppLayout";
+import { isLoggedIn } from "./auth";
+import CommunityDrones from "./pages/CommunityDrones";
+import CommunityDumps from "./pages/CommunityDumps";
+import CommunityForum from "./pages/CommunityForum";
+
+function HomeGate() {
+  return isLoggedIn() ? <HomeLogged /> : <Home />;
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Home />} />
+          {/* Home: pública o logueada según sesión */}
+          <Route path="/" element={<HomeGate />} />
+
           <Route path="/login" element={<Login />} />
 
+          {/* Comunidad (logueado) */}
           <Route
-            path="/homelogged"
+            path="/community/drones"
             element={
               <RequireAuthToLogin>
-                <HomeLogged />
+                <CommunityDrones />
+              </RequireAuthToLogin>
+            }
+          />
+          <Route
+            path="/community/dumps"
+            element={
+              <RequireAuthToLogin>
+                <CommunityDumps />
+              </RequireAuthToLogin>
+            }
+          />
+          <Route
+            path="/community/forum"
+            element={
+              <RequireAuthToLogin>
+                <CommunityForum />
               </RequireAuthToLogin>
             }
           />
