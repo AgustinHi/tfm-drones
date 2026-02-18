@@ -26,6 +26,10 @@ const API_UPLOAD_DUMP = () => `/dumps`;
 const API_DELETE_DUMP = (droneId, dumpId) => `/drones/${droneId}/dumps/${dumpId}`;
 const PARSE_ROUTE = (droneId, dumpId) => `/drones/${droneId}/dumps/${dumpId}/parse`;
 
+// Comunidad
+const API_COMMUNITY_FEED = () => `/community/feed`;
+const API_COMMUNITY_POSTS = () => `/community/posts`;
+
 function accentColorForId(id) {
   const n = Number(id);
   const base = Number.isFinite(n) ? n : 0;
@@ -155,6 +159,12 @@ export default function DroneDetail() {
   const [dumpMsg, setDumpMsg] = useState({ type: "", text: "" });
   const dumpInputRef = useRef(null);
 
+  // Comunidad (publicación del dron)
+  const [community, setCommunity] = useState({ is_public: false, title: "", public_note: "" });
+  const [communityTouched, setCommunityTouched] = useState(false);
+  const [communityBusy, setCommunityBusy] = useState(false);
+  const [communityMsg, setCommunityMsg] = useState({ type: "", text: "" });
+
   const setError = (text) => setMsg({ type: "error", text });
   const setOk = (text) => setMsg({ type: "ok", text });
   const clearMsg = () => setMsg({ type: "", text: "" });
@@ -162,6 +172,10 @@ export default function DroneDetail() {
   const setDumpError = (text) => setDumpMsg({ type: "error", text });
   const setDumpOk = (text) => setDumpMsg({ type: "ok", text });
   const clearDumpMsg = () => setDumpMsg({ type: "", text: "" });
+
+  const setCommunityError = (text) => setCommunityMsg({ type: "error", text });
+  const setCommunityOk = (text) => setCommunityMsg({ type: "ok", text });
+  const clearCommunityMsg = () => setCommunityMsg({ type: "", text: "" });
 
   const fillFormFromDrone = (d) => {
     setForm({
@@ -189,6 +203,9 @@ export default function DroneDetail() {
       const res = await api.get(`/drones/${droneId}`);
       setDrone(res.data);
       fillFormFromDrone(res.data);
+      if (!communityTouched) {
+        setCommunity((c) => ({ ...c, title: c.title?.trim() ? c.title : res.data?.name ?? "" }));
+      }
     } catch (err) {
       if (!err?.response)
         setError(tv("errors.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
@@ -199,7 +216,6 @@ export default function DroneDetail() {
     }
   }
 
-  // IMPORTANTE: si llamas a fetchDumps() justo después de setDumpOk, NO debemos borrar el banner.
   async function fetchDumps({ silent = false } = {}) {
     if (!silent) clearDumpMsg();
     try {
@@ -218,12 +234,72 @@ export default function DroneDetail() {
     }
   }
 
+  async function fetchCommunityFromFeed({ silent = false } = {}) {
+    if (!silent) clearCommunityMsg();
+
+    try {
+      const res = await api.get(API_COMMUNITY_FEED());
+      const arr = Array.isArray(res.data) ? res.data : [];
+
+      const match = arr.find((it) => Number(it?.drone?.id) === Number(droneId));
+      if (match?.post) {
+        setCommunity({
+          is_public: !!match.post.is_public,
+          title: match.post.title ?? "",
+          public_note: match.post.public_note ?? "",
+        });
+        setCommunityTouched(true);
+      }
+    } catch {
+      // Silencioso: la comunidad no debe romper DroneDetail
+      // (Esto quita el warning no-unused-vars de ESLint)
+    }
+  }
+
+  async function saveCommunityPost() {
+    clearCommunityMsg();
+
+    const isPublic = !!community.is_public;
+    const title = (community.title || "").trim();
+    const publicNote = (community.public_note || "").trim();
+
+    if (isPublic && !title) {
+      setCommunityError(tv("detail.community.validation.title", "El título público es obligatorio.", "Public title is required."));
+      return;
+    }
+
+    const payload = {
+      drone_id: Number(droneId),
+      is_public: isPublic,
+      title: title || (drone?.name ? String(drone.name) : `Dron #${droneId}`),
+      public_note: publicNote ? publicNote : null,
+    };
+
+    try {
+      setCommunityBusy(true);
+      await api.post(API_COMMUNITY_POSTS(), payload);
+
+      setCommunityOk(
+        isPublic
+          ? tv("detail.community.ok.published", "Publicado en Comunidad.", "Published to Community.")
+          : tv("detail.community.ok.hidden", "Ocultado de Comunidad.", "Hidden from Community.")
+      );
+
+      if (isPublic) await fetchCommunityFromFeed({ silent: true });
+    } catch (err) {
+      setCommunityError(extractApiError(err, tv("detail.community.error", "No se pudo guardar la publicación.", "Could not save community post.")));
+    } finally {
+      setCommunityBusy(false);
+    }
+  }
+
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!alive) return;
       await fetchDrone();
       await fetchDumps();
+      await fetchCommunityFromFeed({ silent: true });
     })();
     return () => {
       alive = false;
@@ -414,7 +490,10 @@ export default function DroneDetail() {
       {/* Header */}
       <div className="relative overflow-hidden rounded-[22px] bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
         <div className="pointer-events-none absolute left-0 top-0 h-full w-[5px]" style={{ backgroundColor: accent, opacity: 0.75 }} />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accent}66, transparent)` }} />
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px"
+          style={{ background: `linear-gradient(90deg, transparent, ${accent}66, transparent)` }}
+        />
         <div className="pointer-events-none absolute inset-0 [background:radial-gradient(70%_60%_at_50%_38%,rgba(255,255,255,0.98)_0%,rgba(255,255,255,0.78)_30%,rgba(255,255,255,0.46)_55%,rgba(0,0,0,0.10)_78%,rgba(0,0,0,0.16)_100%)]" />
         <div className="pointer-events-none absolute inset-0 bg-primary/4" />
         <div className="pointer-events-none absolute inset-[12px] rounded-[16px] ring-1 ring-black/10" />
@@ -567,6 +646,111 @@ export default function DroneDetail() {
                       })}
                     </ul>
                   )}
+                </div>
+              </Card>
+
+              {/* Comunidad */}
+              <Card title={tv("detail.community.title", "Comunidad", "Community")} className="bg-white/55 shadow-xl backdrop-blur-2xl ring-1 ring-black/10">
+                <div className="grid gap-4">
+                  <MessageBanner msg={communityMsg} />
+
+                  <label className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/45 px-4 py-3 shadow-sm backdrop-blur-xl ring-1 ring-black/10">
+                    <div className="min-w-0">
+                      <div className="text-sm font-extrabold">{tv("detail.community.publishLabel", "Publicar este dron", "Publish this drone")}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {tv(
+                          "detail.community.publishHint",
+                          "Si lo publicas, aparecerá en la sección de Comunidad para otros usuarios.",
+                          "If you publish it, it will appear in the Community section for other users."
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className={["text-xs font-extrabold", community.is_public ? "text-emerald-700" : "text-muted-foreground"].join(" ")}>
+                        {community.is_public
+                          ? tv("detail.community.status.public", "PÚBLICO", "PUBLIC")
+                          : tv("detail.community.status.private", "PRIVADO", "PRIVATE")}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCommunityTouched(true);
+                          setCommunity((c) => ({ ...c, is_public: !c.is_public }));
+                        }}
+                        disabled={communityBusy}
+                        className={[
+                          "relative inline-flex h-9 w-[64px] items-center rounded-full transition",
+                          "ring-1 ring-black/10 shadow-sm backdrop-blur-xl",
+                          community.is_public ? "bg-emerald-500/25" : "bg-white/40",
+                          communityBusy ? "opacity-60" : "hover:ring-black/15",
+                        ].join(" ")}
+                        aria-pressed={community.is_public}
+                      >
+                        <span
+                          className={[
+                            "inline-block h-7 w-7 transform rounded-full bg-white shadow-sm transition",
+                            community.is_public ? "translate-x-8" : "translate-x-1",
+                          ].join(" ")}
+                        />
+                      </button>
+                    </div>
+                  </label>
+
+                  <Input
+                    label={tv("detail.community.titleLabel", "Título público", "Public title")}
+                    value={community.title}
+                    onChange={(e) => {
+                      setCommunityTouched(true);
+                      setCommunity((c) => ({ ...c, title: e.target.value }));
+                    }}
+                    placeholder={tv("detail.community.titlePh", "Ej: Beluga (circuito cerrado)", "e.g., Beluga (closed track)")}
+                  />
+
+                  <label className="grid gap-1">
+                    <span className="text-sm font-semibold text-muted-foreground">{tv("detail.community.noteLabel", "Nota pública (opcional)", "Public note (optional)")}</span>
+                    <textarea
+                      value={community.public_note}
+                      onChange={(e) => {
+                        setCommunityTouched(true);
+                        setCommunity((c) => ({ ...c, public_note: e.target.value }));
+                      }}
+                      rows={4}
+                      placeholder={tv(
+                        "detail.community.notePh",
+                        "Qué quieres compartir de este dron: objetivo, configuración, recomendaciones…",
+                        "What do you want to share: goal, configuration, tips…"
+                      )}
+                      className={[
+                        "w-full rounded-xl bg-white/45 backdrop-blur-xl px-3 py-2 text-sm shadow-sm",
+                        "ring-1 ring-black/10",
+                        "transition-all placeholder:text-muted-foreground/70",
+                        "hover:ring-black/15",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      ].join(" ")}
+                    />
+                  </label>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button onClick={saveCommunityPost} disabled={communityBusy}>
+                      {communityBusy
+                        ? tv("detail.community.saving", "Guardando...", "Saving...")
+                        : tv("detail.community.saveBtn", "Guardar publicación", "Save post")}
+                    </Button>
+
+                    <Button type="button" variant="outline" onClick={() => fetchCommunityFromFeed()} disabled={communityBusy}>
+                      {tv("detail.community.reload", "Recargar", "Reload")}
+                    </Button>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    {tv(
+                      "detail.community.disclaimer",
+                      "Nota: en una siguiente fase podrás decidir qué dumps hacer públicos (independiente del dron).",
+                      "Note: in a next phase you’ll decide which dumps are public (independent from the drone)."
+                    )}
+                  </div>
                 </div>
               </Card>
             </>
