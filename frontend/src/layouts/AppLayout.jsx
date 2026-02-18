@@ -7,7 +7,10 @@ import { useTranslation } from "react-i18next";
 const BG_URL = "/bg-hangar.jpeg";
 
 function formatPath(pathname, t) {
-  if (!pathname || pathname === "/") return t("nav.home", { defaultValue: "Inicio" });
+  if (!pathname || pathname === "/" || pathname === "/homelogged") {
+    return t("nav.home", { defaultValue: "Inicio" });
+  }
+
   const parts = pathname.split("/").filter(Boolean);
 
   if (parts[0] === "login") return t("nav.login", { defaultValue: "Iniciar sesión" });
@@ -57,9 +60,7 @@ function LanguageSwitch() {
 
   return (
     <div
-      className={[
-        "inline-flex items-center gap-1 rounded-xl bg-white/45 p-1 shadow-sm backdrop-blur-xl ring-1 ring-black/10",
-      ].join(" ")}
+      className="inline-flex items-center gap-1 rounded-xl bg-white/45 p-1 shadow-sm backdrop-blur-xl ring-1 ring-black/10"
       aria-label={t("lang.aria", { defaultValue: "Selector de idioma" })}
     >
       <button
@@ -67,18 +68,23 @@ function LanguageSwitch() {
         onClick={() => setLang("es")}
         className={[
           "h-9 rounded-lg px-3 text-xs font-extrabold transition",
-          lang === "es" ? "bg-primary/14 text-foreground shadow-sm" : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
+          lang === "es"
+            ? "bg-primary/14 text-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
         ].join(" ")}
         aria-pressed={lang === "es"}
       >
         ES
       </button>
+
       <button
         type="button"
         onClick={() => setLang("en")}
         className={[
           "h-9 rounded-lg px-3 text-xs font-extrabold transition",
-          lang === "en" ? "bg-primary/14 text-foreground shadow-sm" : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
+          lang === "en"
+            ? "bg-primary/14 text-foreground shadow-sm"
+            : "text-muted-foreground hover:bg-primary/10 hover:text-foreground",
         ].join(" ")}
         aria-pressed={lang === "en"}
       >
@@ -91,7 +97,8 @@ function LanguageSwitch() {
 function MobileNav() {
   const { pathname } = useLocation();
   const logged = isLoggedIn();
-  const isHome = pathname === "/";
+  const homeTo = logged ? "/homelogged" : "/";
+  const isHome = pathname === homeTo;
   const { t } = useTranslation();
 
   return (
@@ -99,7 +106,7 @@ function MobileNav() {
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2">
         {!isHome ? (
           <Link
-            to="/"
+            to={homeTo}
             className="rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
           >
             {t("nav.home", { defaultValue: "Inicio" })}
@@ -133,7 +140,8 @@ function MobileNav() {
 function Topbar() {
   const location = useLocation();
   const logged = isLoggedIn();
-  const isHome = location.pathname === "/";
+  const homeTo = logged ? "/homelogged" : "/";
+  const isHome = location.pathname === homeTo;
   const { t } = useTranslation();
 
   return (
@@ -150,7 +158,7 @@ function Topbar() {
 
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Link to="/" className="group flex items-center gap-3 font-extrabold tracking-tight">
+            <Link to={homeTo} className="group flex items-center gap-3 font-extrabold tracking-tight">
               <span
                 className={[
                   "relative inline-flex h-10 w-10 items-center justify-center rounded-xl",
@@ -158,7 +166,7 @@ function Topbar() {
                   "shadow-sm",
                 ].join(" ")}
               >
-                <span className="pointer-events-none absolute inset-0 -z-10 rounded-xl blur-md opacity-45 bg-primary" />
+                <span className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-primary blur-md opacity-45" />
                 <span className="text-xs font-black tracking-[0.18em] pl-[0.18em]">DH</span>
               </span>
 
@@ -171,8 +179,9 @@ function Topbar() {
           </div>
 
           <nav className="hidden items-center gap-1 sm:flex">
-            {/* Ocultar "Inicio" cuando ya estamos en "/" */}
-            {!isHome ? <NavLink to="/">{t("nav.home", { defaultValue: "Inicio" })}</NavLink> : null}
+            {/* Ocultar "Inicio" cuando ya estamos en la home "correcta" según sesión */}
+            {!isHome ? <NavLink to={homeTo}>{t("nav.home", { defaultValue: "Inicio" })}</NavLink> : null}
+
             {logged ? (
               <NavLink to="/manage">{t("nav.manage", { defaultValue: "Gestión" })}</NavLink>
             ) : (
@@ -212,9 +221,12 @@ function Topbar() {
 
 function Footer() {
   const logged = isLoggedIn();
+  const homeTo = logged ? "/homelogged" : "/";
   const secondaryHref = logged ? "/manage" : "/login";
-  const secondaryLabel = logged ? "Gestión" : "Iniciar sesión";
   const { t } = useTranslation();
+  const secondaryLabel = logged
+    ? t("nav.manage", { defaultValue: "Gestión" })
+    : t("nav.login", { defaultValue: "Iniciar sesión" });
 
   return (
     <footer className="mt-auto">
@@ -240,7 +252,7 @@ function Footer() {
             </p>
 
             <div className="flex items-center gap-3 text-sm">
-              <Link to="/" className="text-muted-foreground hover:text-foreground">
+              <Link to={homeTo} className="text-muted-foreground hover:text-foreground">
                 {t("nav.home", { defaultValue: "Inicio" })}
               </Link>
               <span className="text-muted-foreground/40">·</span>
@@ -258,7 +270,7 @@ function Footer() {
 function PhotoBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10">
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${BG_URL}')` }} />
+      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${BG_URL})` }} />
     </div>
   );
 }

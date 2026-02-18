@@ -1,5 +1,7 @@
+// frontend/src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
+import HomeLogged from "./pages/HomeLogged";
 import Manage from "./pages/Manage";
 import DroneDetail from "./pages/DroneDetail";
 import DumpParse from "./pages/DumpParse";
@@ -14,6 +16,15 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+
+          <Route
+            path="/homelogged"
+            element={
+              <RequireAuthToLogin>
+                <HomeLogged />
+              </RequireAuthToLogin>
+            }
+          />
 
           <Route
             path="/manage"
