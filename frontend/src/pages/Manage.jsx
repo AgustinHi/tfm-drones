@@ -106,10 +106,6 @@ function DroneCard({ d, loading, onView, onDelete, labels }) {
         style={{ backgroundColor: accent, opacity: 0.18 }}
       />
 
-      {/* Detalles técnicos */}
-      <div className="pointer-events-none absolute right-10 top-0 h-10 w-px bg-black/10" />
-      <div className="pointer-events-none absolute right-0 top-10 h-px w-10 bg-black/10" />
-
       {/* Insignia dron */}
       <div className="pointer-events-none absolute right-3 top-3 opacity-60">
         <DroneGlyph color={accent} />
@@ -124,7 +120,6 @@ function DroneCard({ d, loading, onView, onDelete, labels }) {
                 style={{ backgroundColor: accent, opacity: 0.85 }}
                 aria-hidden="true"
               />
-              <span className="font-semibold">#{d.id}</span>
             </div>
 
             <div className="mt-1 truncate text-lg font-extrabold leading-tight pr-10">{d.name || "—"}</div>

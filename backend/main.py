@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth_routes import get_current_user_email, router as auth_router
+from community_routes import router as community_router
 from db import engine, create_tables
 from models import Drone, DroneDump
 
@@ -29,6 +30,7 @@ app = FastAPI(title="TFM Drones API")
 
 create_tables()
 app.include_router(auth_router)
+app.include_router(community_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -118,7 +120,9 @@ def _safe_resolve_inside_base(p: Path) -> Path:
 def _safe_remove_drone_dump_dir(drone_id: int) -> None:
     """
     Borra la carpeta uploads/dumps/drone_{id} (si existe).
-    Best-effort: si falla, no rompe el DELETE del dron (evita dejar la API “bloqueada” por locks en Windows).
+
+    Best-effort: si falla, no rompe el DELETE del dron
+    (evita dejar la API “bloqueada” por locks en Windows).
     """
     base = DUMPS_DIR.resolve()
     target = (DUMPS_DIR / f"drone_{drone_id}").resolve()
@@ -140,6 +144,7 @@ def _safe_remove_single_dump_file(drone_id: int, stored_path: str) -> None:
     """
     Borra el fichero de un dump concreto, validando que el path está dentro de BASE_DIR.
     Además, si el directorio drone_{id} queda vacío, lo elimina (best-effort).
+
     Reglas:
     - Si el fichero NO existe: no falla (lo tratamos como ya borrado).
     - Si existe y no se puede borrar: lanza 500 y NO se debe borrar el registro en BD.
@@ -149,284 +154,192 @@ def _safe_remove_single_dump_file(drone_id: int, stored_path: str) -> None:
         # No hay path: no podemos tocar disco, pero tampoco queremos romper.
         return
 
-    file_path = _safe_resolve_inside_base(BASE_DIR / sp)
+    fp = _safe_resolve_inside_base(BASE_DIR / sp)
 
-    if file_path.exists():
+    # Debe estar dentro de uploads/dumps/drone_{id}/...
+    expected_dir = _safe_resolve_inside_base(DUMPS_DIR / f"drone_{drone_id}")
+    if expected_dir != fp.parent and expected_dir not in fp.parents:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid dump stored path")
+
+    if fp.exists():
         try:
-            if not file_path.is_file():
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid dump file path")
-            file_path.unlink()
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Cannot delete dump file: {e}",
-            )
+            fp.unlink()
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not delete dump file")
 
-    # Limpieza del directorio drone_{id} si queda vacío (best-effort)
+    # Best-effort: si la carpeta se queda vacía, la quitamos
     try:
-        base = DUMPS_DIR.resolve()
-        expected_dir = (DUMPS_DIR / f"drone_{drone_id}").resolve()
         if expected_dir.exists() and expected_dir.is_dir():
-            if base == expected_dir or base in expected_dir.parents:
-                if expected_dir.name == f"drone_{drone_id}":
-                    if not any(expected_dir.iterdir()):
-                        expected_dir.rmdir()
+            if not any(expected_dir.iterdir()):
+                expected_dir.rmdir()
     except Exception:
         pass
 
 
-def _enforce_max_bytes(data_len: int, limit: int, what: str):
-    if data_len > limit:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"{what} too large (>{limit} bytes)",
-        )
+def _sanitize_filename(name: str) -> str:
+    # Evita rutas y chars raros
+    name = (name or "").strip().replace("\\", "/").split("/")[-1]
+    # muy simple: quita NULL y controla longitud
+    name = name.replace("\x00", "")
+    return name[:200] if len(name) > 200 else name
 
 
-def _gunzip_with_limit(raw: bytes, limit: int) -> bytes:
+def _read_limited(stream: io.BufferedReader, limit: int) -> bytes:
+    # Lee hasta limit+1 para detectar overflow
+    data = stream.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Dump too large")
+    return data
+
+
+def _decompress_gzip_limited(payload: bytes, limit: int) -> bytes:
     try:
-        with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
-            out = gz.read(limit + 1)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid .gz dump (cannot decompress): {e}",
-        )
-    _enforce_max_bytes(len(out), limit, "Decompressed dump")
-    return out
+        with gzip.GzipFile(fileobj=io.BytesIO(payload), mode="rb") as gz:
+            return _read_limited(gz, limit)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid gzip dump")
+
+
+def _decompress_zip_limited(payload: bytes, limit: int) -> bytes:
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as zf:
+            # Sólo 1 fichero dentro (defensivo)
+            names = [n for n in zf.namelist() if not n.endswith("/")]
+            if not names:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty zip dump")
+            if len(names) > 1:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Zip with multiple files is not allowed")
+
+            with zf.open(names[0]) as f:
+                return _read_limited(f, limit)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid zip dump")
 
 
 def _read_dump_payload_bytes(file_path: Path, ext: str) -> bytes:
-    raw = file_path.read_bytes()
-    _enforce_max_bytes(len(raw), MAX_DUMP_UPLOAD_BYTES, "Dump file")
+    payload = file_path.read_bytes()
 
+    # Si viene comprimido, lo descomprimimos limitado
     if ext == ".gz":
-        return _gunzip_with_limit(raw, MAX_DUMP_DECOMPRESSED_BYTES)
-
+        return _decompress_gzip_limited(payload, MAX_DUMP_DECOMPRESSED_BYTES)
     if ext == ".zip":
-        try:
-            with zipfile.ZipFile(io.BytesIO(raw)) as z:
-                members = [m for m in z.infolist() if not m.is_dir()]
-                if not members:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Empty .zip dump (no files inside)",
-                    )
+        return _decompress_zip_limited(payload, MAX_DUMP_DECOMPRESSED_BYTES)
 
-                def score(m: zipfile.ZipInfo):
-                    name = (m.filename or "").lower()
-                    preferred = name.endswith((".txt", ".dump", ".cli", ".cfg", ".diff", ".config"))
-                    pri = 0 if preferred else 10
-                    return (pri, -int(getattr(m, "file_size", 0) or 0), name)
-
-                members.sort(key=score)
-                pick = members[0]
-
-                file_size = int(getattr(pick, "file_size", 0) or 0)
-                _enforce_max_bytes(file_size, MAX_DUMP_DECOMPRESSED_BYTES, "Decompressed dump")
-
-                with z.open(pick) as f:
-                    data = f.read(MAX_DUMP_DECOMPRESSED_BYTES + 1)
-
-                _enforce_max_bytes(len(data), MAX_DUMP_DECOMPRESSED_BYTES, "Decompressed dump")
-                return data
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid .zip dump (cannot read): {e}",
-            )
-
-    _enforce_max_bytes(len(raw), MAX_DUMP_DECOMPRESSED_BYTES, "Dump payload")
-    return raw
+    # .sql/.dump/.txt → tal cual (pero limitado a MAX_DUMP_DECOMPRESSED_BYTES)
+    if len(payload) > MAX_DUMP_DECOMPRESSED_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Dump too large")
+    return payload
 
 
-def _decode_dump_text(data: bytes) -> str:
-    for enc in ("utf-8", "utf-16", "latin-1"):
-        try:
-            return data.decode(enc)
-        except Exception:
-            continue
-    return data.decode("utf-8", errors="replace")
-
-
-def _group_setting_key(key: str) -> str:
-    k = (key or "").strip().lower()
-
-    if k.startswith("osd") or "osd" in k or k.startswith("displayport"):
-        return "osd"
-
-    if k.startswith(("vtx", "vtx_", "vcd_", "tramp", "smartaudio")) or "vtx" in k:
-        return "vtx"
-
-    if k.startswith(("rx_", "serialrx", "crsf", "elrs", "expresslrs", "sbus", "spektrum")) or "receiver" in k:
-        return "rx"
-
-    if (
-        k.startswith(("p_", "i_", "d_", "ff_"))
-        or "pid" in k
-        or k.startswith(("iterm", "dterm", "pterm"))
-        or "gyro" in k
-        or "filter" in k
-        or "dshot" in k
-    ):
-        return "pid"
-
-    if "rate" in k or "expo" in k or k.startswith(("rc_", "rates_", "throttle_", "roll_rate", "pitch_rate", "yaw_rate")):
-        return "rates"
-
-    if k.startswith(("serial_", "uart", "gps_", "baro", "mag", "i2c", "spi", "softserial")):
-        return "ports"
-
-    return "misc"
+def _decode_dump_text(payload: bytes) -> str:
+    # Intenta UTF-8; si falla, latin-1 (mucha gente guarda así)
+    try:
+        return payload.decode("utf-8", errors="replace")
+    except Exception:
+        return payload.decode("latin-1", errors="replace")
 
 
 def parse_betaflight_like(text: str) -> dict:
-    lines = text.splitlines()
+    """
+    Parser “Betaflight-like” defensivo:
+    - detecta líneas típicas: '# version', '# resources', 'resource', 'set', 'profile', 'rateprofile', 'aux'
+    - agrupa por secciones
+    """
+    lines = (text or "").splitlines()
 
-    firmware: dict = {}
-    features_enabled: list[str] = []
-    features_disabled: list[str] = []
-    serial_lines: list[str] = []
+    version = None
+    board = None
+    build = None
+
     resource_lines: list[str] = []
     aux_lines: list[str] = []
+    global_settings: list[str] = []
+    profile_settings: dict[str, list[str]] = {}
+    rateprofile_settings: dict[str, list[str]] = {}
     other_cmds: list[str] = []
+    warnings: list[str] = []
 
-    global_settings: dict[str, str] = {}
-
-    current_profile = "0"
-    current_rateprofile = "0"
-
-    profile_settings: dict[str, dict[str, dict[str, str]]] = {}
-    rateprofile_settings: dict[str, dict[str, dict[str, str]]] = {}
-
-    def ensure_profile(p: str):
-        if p not in profile_settings:
-            profile_settings[p] = {"pid": {}, "rates": {}, "osd": {}, "vtx": {}, "rx": {}, "ports": {}, "misc": {}}
-
-    def ensure_rateprofile(p: str):
-        if p not in rateprofile_settings:
-            rateprofile_settings[p] = {"pid": {}, "rates": {}, "osd": {}, "vtx": {}, "rx": {}, "ports": {}, "misc": {}}
-
-    ensure_profile(current_profile)
-    ensure_rateprofile(current_rateprofile)
+    current_profile = None
+    current_rateprofile = None
 
     recognized = 0
     unknown = 0
 
     for raw in lines:
-        s = (raw or "").strip()
-        if not s:
-            continue
-        if s.startswith("#"):
+        line = raw.strip()
+        if not line:
             continue
 
-        low = s.lower()
+        if line.startswith("#"):
+            # comentarios
+            if line.lower().startswith("# version"):
+                version = line
+                recognized += 1
+            elif line.lower().startswith("# board"):
+                board = line
+                recognized += 1
+            elif line.lower().startswith("# build"):
+                build = line
+                recognized += 1
+            continue
 
-        if low.startswith("version"):
-            firmware["version_line"] = s
-            recognized += 1
-            continue
-        if low.startswith("board_name"):
-            parts = s.split(maxsplit=1)
-            firmware["board_name"] = parts[1].strip() if len(parts) > 1 else ""
-            recognized += 1
-            continue
-        if low.startswith("manufacturer_id"):
-            parts = s.split(maxsplit=1)
-            firmware["manufacturer_id"] = parts[1].strip() if len(parts) > 1 else ""
-            recognized += 1
-            continue
-        if low.startswith("name"):
-            parts = s.split(maxsplit=1)
-            firmware["fc_name"] = parts[1].strip() if len(parts) > 1 else ""
-            recognized += 1
-            continue
+        low = line.lower()
 
         if low.startswith("profile "):
-            parts = s.split()
-            current_profile = parts[1] if len(parts) >= 2 else "0"
-            ensure_profile(current_profile)
+            current_profile = line.split(" ", 1)[1].strip() or "0"
+            current_rateprofile = None
+            profile_settings.setdefault(current_profile, [])
             recognized += 1
             continue
 
         if low.startswith("rateprofile "):
-            parts = s.split()
-            current_rateprofile = parts[1] if len(parts) >= 2 else "0"
-            ensure_rateprofile(current_rateprofile)
+            current_rateprofile = line.split(" ", 1)[1].strip() or "0"
+            current_profile = None
+            rateprofile_settings.setdefault(current_rateprofile, [])
+            recognized += 1
+            continue
+
+        if low.startswith("resource ") or low.startswith("resource\t"):
+            resource_lines.append(line)
+            recognized += 1
+            continue
+
+        if low.startswith("aux ") or low.startswith("aux\t"):
+            aux_lines.append(line)
             recognized += 1
             continue
 
         if low.startswith("set "):
-            body = s[4:].strip()
-            if "=" in body:
-                k, v = body.split("=", 1)
-                k = k.strip()
-                v = v.strip()
-                if k:
-                    grp = _group_setting_key(k)
-                    global_settings[k] = v
-
-                    if grp == "pid":
-                        ensure_profile(current_profile)
-                        profile_settings[current_profile][grp][k] = v
-                    elif grp == "rates":
-                        ensure_rateprofile(current_rateprofile)
-                        rateprofile_settings[current_rateprofile][grp][k] = v
-                    else:
-                        ensure_profile(current_profile)
-                        profile_settings[current_profile][grp][k] = v
-
-                    recognized += 1
-                    continue
-
-            other_cmds.append(s)
-            unknown += 1
-            continue
-
-        if low.startswith("serial "):
-            serial_lines.append(s)
+            # settings global o por perfil
+            if current_profile is not None:
+                profile_settings.setdefault(current_profile, []).append(line)
+            elif current_rateprofile is not None:
+                rateprofile_settings.setdefault(current_rateprofile, []).append(line)
+            else:
+                global_settings.append(line)
             recognized += 1
             continue
 
-        if low.startswith("resource "):
-            resource_lines.append(s)
+        # Otros comandos típicos
+        if any(low.startswith(p) for p in ("feature ", "map ", "serial ", "rate ", "rxrange ", "vtxtable ", "smix ", "mmix ")):
+            other_cmds.append(line)
             recognized += 1
             continue
 
-        if low.startswith("aux "):
-            aux_lines.append(s)
-            recognized += 1
-            continue
-
-        if low.startswith("feature "):
-            tok = s.split(maxsplit=1)
-            feat = tok[1].strip() if len(tok) > 1 else ""
-            if feat.startswith("-"):
-                features_disabled.append(feat[1:].strip())
-            elif feat:
-                features_enabled.append(feat)
-            recognized += 1
-            continue
-
-        if low in ("diff all", "dump all") or low.startswith("diff ") or low.startswith("dump "):
-            recognized += 1
-            continue
-
-        other_cmds.append(s)
         unknown += 1
-
-    warnings: list[str] = []
-    if "version_line" not in firmware:
-        warnings.append("No 'version' line found in dump (may not be a Betaflight CLI/diff dump).")
+        if unknown <= 20:
+            warnings.append(f"Unknown line: {line}")
 
     return {
-        "firmware": firmware,
-        "features": {"enabled": sorted(set(features_enabled)), "disabled": sorted(set(features_disabled))},
-        "ports": {"serial": serial_lines},
+        "meta": {
+            "version": version,
+            "board": board,
+            "build": build,
+        },
         "resources": resource_lines,
         "modes": {"aux": aux_lines},
         "settings": {
@@ -511,7 +424,6 @@ def update_drone(drone_id: int, payload: DroneUpdate, user_email: str = Depends(
         d.video = payload.video
         d.radio = payload.radio
         d.components = payload.components
-
         d.brand = payload.brand or ""
         d.model = payload.model or ""
         d.drone_type = payload.drone_type or ""
@@ -527,9 +439,11 @@ def delete_drone(drone_id: int, user_email: str = Depends(get_current_user_email
     with Session(engine) as session:
         d = _get_owned_drone(session, drone_id, user_email)
 
+        # 1) borrar registros en BD (cascade debería borrar dumps)
         session.delete(d)
         session.commit()
 
+    # 2) borrar ficheros en disco (best-effort)
     _safe_remove_drone_dump_dir(drone_id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -544,8 +458,8 @@ async def upload_dump(
     with Session(engine) as session:
         _get_owned_drone(session, drone_id, user_email)
 
-        original_name = file.filename or "upload.bin"
-        ext = Path(original_name).suffix.lower()
+        safe_original = _sanitize_filename(file.filename or "dump.txt")
+        ext = Path(safe_original).suffix.lower()
 
         if ext not in ALLOWED_DUMP_EXTS:
             raise HTTPException(
@@ -553,17 +467,18 @@ async def upload_dump(
                 detail=f"Unsupported file extension: {ext}",
             )
 
-        safe_original = Path(original_name).name
-        stored_name = f"{uuid4().hex}_{safe_original}"
-
+        # Directorio por dron
         drone_dir = DUMPS_DIR / f"drone_{drone_id}"
         drone_dir.mkdir(parents=True, exist_ok=True)
 
+        # Nombre único
+        stored_name = f"{uuid4().hex}_{safe_original}"
         dest_path = drone_dir / stored_name
 
+        # Guardar a disco con límite (MAX_DUMP_UPLOAD_BYTES)
         size = 0
         try:
-            with dest_path.open("wb") as f:
+            with dest_path.open("wb") as out:
                 while True:
                     chunk = await file.read(1024 * 1024)
                     if not chunk:
@@ -572,16 +487,24 @@ async def upload_dump(
                     if size > MAX_DUMP_UPLOAD_BYTES:
                         raise HTTPException(
                             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            detail=f"Dump file too large (>{MAX_DUMP_UPLOAD_BYTES} bytes)",
+                            detail="Dump upload too large",
                         )
-                    f.write(chunk)
+                    out.write(chunk)
         except HTTPException:
-            if dest_path.exists():
-                try:
+            # si sobrepasó, intenta borrar lo escrito
+            try:
+                if dest_path.exists():
                     dest_path.unlink()
-                except Exception:
-                    pass
+            except Exception:
+                pass
             raise
+        except Exception:
+            try:
+                if dest_path.exists():
+                    dest_path.unlink()
+            except Exception:
+                pass
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upload failed")
         finally:
             await file.close()
 

@@ -124,7 +124,47 @@ export default function Login() {
       setAuthSuccess(tv("login.login.success", "Sesión iniciada.", "Signed in."));
       navigate(from, { replace: true });
     } catch (err) {
-      setAuthError(tv("login.error.network", "Error de red o servidor.", "Network or server error."));
+      const status = err?.response?.status;
+
+      // Registro: NO confirmamos si el email existe (evita enumeración).
+      if (authMode === "register") {
+        if (!err?.response) {
+          setAuthError(tv("login.error.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+        } else if (status === 422) {
+          setAuthError(tv("login.register.error.invalid", "Datos inválidos. Revisa los campos.", "Invalid data. Please review the fields."));
+        } else if (status === 409) {
+          // Mensaje seguro: no indica explícitamente que el email ya está registrado.
+          setAuthError(
+            tv(
+              "login.register.error.cannotCreate",
+              "No se pudo crear la cuenta. Si ya tienes una, inicia sesión.",
+              "Could not create the account. If you already have one, please sign in."
+            )
+          );
+        } else {
+          setAuthError(tv("login.error.server", `Error del servidor (HTTP ${status ?? "?"}).`, `Server error (HTTP ${status ?? "?"}).`));
+        }
+
+        console.error(err);
+        return;
+      }
+
+      // Login: mensaje genérico de credenciales sin indicar qué campo falla.
+      if (!err?.response) {
+        setAuthError(tv("login.error.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+      } else if (status === 401) {
+        setAuthError(tv("login.error.invalidCreds", "Credenciales no válidas.", "Invalid credentials."));
+      } else if (status === 422) {
+        setAuthError(tv("login.error.invalid", "Datos inválidos. Revisa los campos.", "Invalid data. Please review the fields."));
+      } else {
+        const detail = err?.response?.data?.detail;
+        if (typeof detail === "string" && detail.trim()) {
+          setAuthError(detail);
+        } else {
+          setAuthError(tv("login.error.server", `Error del servidor (HTTP ${status ?? "?"}).`, `Server error (HTTP ${status ?? "?"}).`));
+        }
+      }
+
       console.error(err);
     } finally {
       setBusy(false);

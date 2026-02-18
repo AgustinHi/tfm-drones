@@ -1,15 +1,5 @@
 # backend/models.py
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    ForeignKey,
-    Integer,
-    String,
-    Text,
-    UniqueConstraint,
-    text,
-)
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.sql import func
@@ -43,14 +33,6 @@ class Drone(Base):
 
     dumps = relationship("DroneDump", back_populates="drone", cascade="all, delete-orphan")
 
-    # 1 publicación pública (opcional) por dron/owner
-    community_post = relationship(
-        "CommunityPost",
-        back_populates="drone",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
-
 
 class DroneDump(Base):
     __tablename__ = "drone_dumps"
@@ -63,30 +45,6 @@ class DroneDump(Base):
     stored_path = Column(String(500), nullable=False)
     bytes = Column(Integer, nullable=False)
 
-    # ✅ YA existe en BD (DEFAULT 0). Aquí lo mapeamos.
-    is_public = Column(Boolean, nullable=False, server_default=text("0"))
-
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
     drone = relationship("Drone", back_populates="dumps")
-
-
-class CommunityPost(Base):
-    __tablename__ = "community_posts"
-    __table_args__ = (
-        UniqueConstraint("drone_id", "owner_email", name="uq_community_posts_drone_owner"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    drone_id = Column(Integer, ForeignKey("drones.id", ondelete="CASCADE"), nullable=False, index=True)
-    owner_email = Column(String(255), nullable=False, index=True)
-
-    title = Column(String(160), nullable=True)
-    public_note = Column(Text, nullable=True)
-
-    is_public = Column(Boolean, nullable=False, server_default=text("0"))
-
-    created_at = Column(DateTime, nullable=False, server_default=func.now())
-    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
-
-    drone = relationship("Drone", back_populates="community_post")

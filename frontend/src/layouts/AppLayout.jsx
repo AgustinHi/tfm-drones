@@ -4,13 +4,12 @@ import { isLoggedIn } from "../auth";
 import Button from "../ui/Button";
 import { useTranslation } from "react-i18next";
 
-const BG_URL = "/bg-hangar.jpeg";
+const BG_URL_HANGAR = "/bg-hangar.jpeg";
+const BG_URL_HOME_LOGGED = "/bg-homelogged.png";
+const BG_URL_HOME_PUBLIC = "/bg-home.png";
 
 function formatPath(pathname, t) {
-  if (!pathname || pathname === "/" || pathname === "/homelogged") {
-    return t("nav.home", { defaultValue: "Inicio" });
-  }
-
+  if (!pathname || pathname === "/") return t("nav.home", { defaultValue: "Inicio" });
   const parts = pathname.split("/").filter(Boolean);
 
   if (parts[0] === "login") return t("nav.login", { defaultValue: "Iniciar sesión" });
@@ -76,7 +75,6 @@ function LanguageSwitch() {
       >
         ES
       </button>
-
       <button
         type="button"
         onClick={() => setLang("en")}
@@ -97,8 +95,7 @@ function LanguageSwitch() {
 function MobileNav() {
   const { pathname } = useLocation();
   const logged = isLoggedIn();
-  const homeTo = logged ? "/homelogged" : "/";
-  const isHome = pathname === homeTo;
+  const isHome = pathname === "/";
   const { t } = useTranslation();
 
   return (
@@ -106,7 +103,7 @@ function MobileNav() {
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2">
         {!isHome ? (
           <Link
-            to={homeTo}
+            to="/"
             className="rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-primary/10 hover:text-foreground"
           >
             {t("nav.home", { defaultValue: "Inicio" })}
@@ -140,8 +137,7 @@ function MobileNav() {
 function Topbar() {
   const location = useLocation();
   const logged = isLoggedIn();
-  const homeTo = logged ? "/homelogged" : "/";
-  const isHome = location.pathname === homeTo;
+  const isHome = location.pathname === "/";
   const { t } = useTranslation();
 
   return (
@@ -158,7 +154,7 @@ function Topbar() {
 
         <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Link to={homeTo} className="group flex items-center gap-3 font-extrabold tracking-tight">
+            <Link to="/" className="group flex items-center gap-3 font-extrabold tracking-tight">
               <span
                 className={[
                   "relative inline-flex h-10 w-10 items-center justify-center rounded-xl",
@@ -166,7 +162,7 @@ function Topbar() {
                   "shadow-sm",
                 ].join(" ")}
               >
-                <span className="pointer-events-none absolute inset-0 -z-10 rounded-xl bg-primary blur-md opacity-45" />
+                <span className="pointer-events-none absolute inset-0 -z-10 rounded-xl blur-md opacity-45 bg-primary" />
                 <span className="text-xs font-black tracking-[0.18em] pl-[0.18em]">DH</span>
               </span>
 
@@ -179,9 +175,7 @@ function Topbar() {
           </div>
 
           <nav className="hidden items-center gap-1 sm:flex">
-            {/* Ocultar "Inicio" cuando ya estamos en la home "correcta" según sesión */}
-            {!isHome ? <NavLink to={homeTo}>{t("nav.home", { defaultValue: "Inicio" })}</NavLink> : null}
-
+            {!isHome ? <NavLink to="/">{t("nav.home", { defaultValue: "Inicio" })}</NavLink> : null}
             {logged ? (
               <NavLink to="/manage">{t("nav.manage", { defaultValue: "Gestión" })}</NavLink>
             ) : (
@@ -208,7 +202,6 @@ function Topbar() {
           </div>
         </div>
 
-        {/* En móvil lo ponemos debajo para no cargar la topbar */}
         <div className="sm:hidden px-4 pb-3">
           <LanguageSwitch />
         </div>
@@ -221,12 +214,9 @@ function Topbar() {
 
 function Footer() {
   const logged = isLoggedIn();
-  const homeTo = logged ? "/homelogged" : "/";
   const secondaryHref = logged ? "/manage" : "/login";
+  const secondaryLabel = logged ? "Gestión" : "Iniciar sesión";
   const { t } = useTranslation();
-  const secondaryLabel = logged
-    ? t("nav.manage", { defaultValue: "Gestión" })
-    : t("nav.login", { defaultValue: "Iniciar sesión" });
 
   return (
     <footer className="mt-auto">
@@ -237,11 +227,8 @@ function Footer() {
         <div className="pointer-events-none absolute inset-0 bg-primary/6 mix-blend-soft-light" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-primary/18 to-transparent" />
 
-        {/* hairline difuminado arriba (sustituye al border-t) */}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-black/18 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-black/12 to-transparent" />
-
-        {/* fade inferior */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-9 bg-gradient-to-b from-transparent to-black/28" />
 
         <div className="relative mx-auto flex max-w-5xl flex-col gap-3 px-4 py-8 sm:px-6">
@@ -252,7 +239,7 @@ function Footer() {
             </p>
 
             <div className="flex items-center gap-3 text-sm">
-              <Link to={homeTo} className="text-muted-foreground hover:text-foreground">
+              <Link to="/" className="text-muted-foreground hover:text-foreground">
                 {t("nav.home", { defaultValue: "Inicio" })}
               </Link>
               <span className="text-muted-foreground/40">·</span>
@@ -268,9 +255,36 @@ function Footer() {
 }
 
 function PhotoBackground() {
+  const { pathname } = useLocation();
+  const logged = isLoggedIn();
+
+  // REGLAS DE FONDO:
+  // - Public "/" (sin login): Home.jsx pinta su bg-home -> aquí NO ponemos nada.
+  // - Public "/login" (sin login): queremos look "bg-home" (no hangar).
+  // - Private "/" (con login): bg-homelogged.
+  // - Resto privado (manage/detail/parse): bg-hangar.
+  const isPublicHome = pathname === "/" && !logged;
+  if (isPublicHome) return null;
+
+  if (!logged) {
+    // Fondo estilo Home pública para login (y cualquier otra ruta pública si la hubiera)
+    return (
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <div
+          className="absolute inset-0 bg-cover bg-top bg-no-repeat"
+          style={{ backgroundImage: `url('${BG_URL_HOME_PUBLIC}')` }}
+        />
+        <div className="absolute inset-0 bg-black/20" />
+      </div>
+    );
+  }
+
+  const isHomeLogged = pathname === "/" && logged;
+  const url = isHomeLogged ? BG_URL_HOME_LOGGED : BG_URL_HANGAR;
+
   return (
     <div className="pointer-events-none fixed inset-0 -z-10">
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${BG_URL})` }} />
+      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url('${url}')` }} />
     </div>
   );
 }

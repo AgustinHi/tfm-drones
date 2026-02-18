@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "exclude": {
+    "global": [
+      "**/test_*.py",
+      "**/*.test.jsx",
+      "**/*.test.js",
+      "**/conftest.py",
+      "**/__tests__/**"
+    ]
+  }
+}
