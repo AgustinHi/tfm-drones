@@ -12,3 +12,4 @@ PyJWT==2.11.0
 pytest==8.0.0
 pytest-asyncio==0.21.1
 httpx==0.25.2
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
