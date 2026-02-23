@@ -1,10 +1,11 @@
-# backend/main.py
 from pathlib import Path
 from uuid import uuid4
 import io
 import gzip
 import zipfile
 import shutil
+import time
+import logging
 
 from fastapi import (
     Depends,
@@ -15,8 +16,10 @@ from fastapi import (
     File,
     Form,
     status,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,22 +29,64 @@ from community_routes import router as community_router
 from db import engine, create_tables
 from models import Drone, DroneDump
 
-app = FastAPI(title="TFM Drones API")
+# Configurar logging para seguridad
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-create_tables()
-app.include_router(auth_router)
-app.include_router(community_router)
+app = FastAPI(
+    title="TFM Drones API",
+    description="API segura para gestión de drones",
+    version="1.0.0"
+)
 
+# Middleware de seguridad: Trusted Hosts (previene Host Header Injection)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=[
+        "localhost",
+        "127.0.0.1",
+        "localhost:8000",
+        "127.0.0.1:8000",
+        "testserver",
+        "confident-grace-production-331f.up.railway.app",
+    ]
+)
+
+# CORS más restrictivo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://tfm-drones-production.up.railway.app",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # OPTIONS para preflight
+    allow_headers=["Content-Type", "Authorization"],  # explícito
+    max_age=3600,  # Pre-flight cache 1 hora
 )
+
+# Middleware para agregar headers de seguridad
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Prevenir XSS
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Política de seguridad estricta
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # CSP básica
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    # Referrer Policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Permissions Policy
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+create_tables()
+app.include_router(auth_router)
+app.include_router(community_router)
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOADS_DIR = BASE_DIR / "uploads"
