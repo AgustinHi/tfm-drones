@@ -1,5 +1,4 @@
 // frontend/src/__tests__/useTranslationHelper.test.js
-/* eslint-env node, jest */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";

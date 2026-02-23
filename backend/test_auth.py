@@ -108,7 +108,7 @@ class TestAuthEndpoints:
             json={"email": "nonexistent@example.com", "password": "anypass"},
         )
         assert response.status_code == 401
-        assert "Invalid credentials" in response.json()["detail"]
+        assert "Invalid email or password" in response.json()["detail"]
 
     def test_login_invalid_password(self, client):
         """Test login con contraseña incorrecta"""
@@ -127,7 +127,7 @@ class TestAuthEndpoints:
             json={"email": email, "password": "WrongPassword"},
         )
         assert response.status_code == 401
-        assert "Invalid credentials" in response.json()["detail"]
+        assert "Invalid email or password" in response.json()["detail"]
 
     def test_me_with_valid_token(self, client):
         """Test endpoint /me con token válido"""
