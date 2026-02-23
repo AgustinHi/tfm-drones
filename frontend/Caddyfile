@@ -8,8 +8,11 @@ route {
     respond "caddyfile-ok" 200
   }
 
-  handle_path /api/* {
-    reverse_proxy https://confident-grace-production-331f.up.railway.app
+  handle /api/* {
+    uri strip_prefix /api
+    reverse_proxy https://confident-grace-production-331f.up.railway.app {
+      header_up Host confident-grace-production-331f.up.railway.app
+    }
   }
 
   try_files {path} /index.html
