@@ -1,3 +1,4 @@
+@'
 :{$PORT}
 
 root * /app/dist
@@ -11,3 +12,4 @@ route {
   try_files {path} /index.html
   file_server
 }
+'@ | Set-Content -Encoding utf8 frontend\Caddyfile
