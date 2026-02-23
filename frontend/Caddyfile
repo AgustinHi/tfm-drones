@@ -1,0 +1,13 @@
+:{$PORT}
+
+root * /app/dist
+encode gzip
+
+# /api/* -> backend (quitando el prefijo /api)
+handle_path /api/* {
+  reverse_proxy https://confident-grace-production-331f.up.railway.app
+}
+
+# SPA (React Router)
+try_files {path} /index.html
+file_server
