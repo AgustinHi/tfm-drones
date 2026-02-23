@@ -9,7 +9,7 @@ passlib==1.7.4
 PyJWT==2.11.0
 email-validator==2.2.0
 cryptography==46.0.5
-python-multipart
+python-multipart==0.0.22
 
 # Testing
 pytest==8.0.0
