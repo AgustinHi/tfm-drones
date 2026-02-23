@@ -9,7 +9,7 @@ import Input from "../ui/Input";
 import { useTranslation } from "react-i18next";
 
 const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-const isValidPassword = (v) => v.trim().length >= 6;
+const isValidPassword = (v) => v.trim().length >= 8;
 
 function getSafeRedirectTarget(candidate) {
   // React Router puede pasar string o un location-like object
@@ -97,8 +97,8 @@ export default function Login() {
       return setAuthError(
         tv(
           "login.validation.password",
-          "La contraseña debe tener al menos 6 caracteres.",
-          "Password must be at least 6 characters."
+          "La contraseña debe tener al menos 8 caracteres.",
+          "Password must be at least 8 characters."
         )
       );
     }
@@ -129,7 +129,9 @@ export default function Login() {
       // Registro: NO confirmamos si el email existe (evita enumeración).
       if (authMode === "register") {
         if (!err?.response) {
-          setAuthError(tv("login.error.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server."));
+          setAuthError(
+            tv("login.error.network", "Error de red: no se pudo contactar con el servidor.", "Network error: could not reach the server.")
+          );
         } else if (status === 422) {
           setAuthError(tv("login.register.error.invalid", "Datos inválidos. Revisa los campos.", "Invalid data. Please review the fields."));
         } else if (status === 409) {
@@ -142,7 +144,9 @@ export default function Login() {
             )
           );
         } else {
-          setAuthError(tv("login.error.server", `Error del servidor (HTTP ${status ?? "?"}).`, `Server error (HTTP ${status ?? "?"}).`));
+          setAuthError(
+            tv("login.error.server", `Error del servidor (HTTP ${status ?? "?"}).`, `Server error (HTTP ${status ?? "?"}).`)
+          );
         }
 
         console.error(err);
@@ -206,9 +210,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <h1 className="text-3xl font-extrabold tracking-tight">
-                {tv("login.title", "Inicia sesión para continuar", "Sign in to continue")}
-              </h1>
+              <h1 className="text-3xl font-extrabold tracking-tight">{tv("login.title", "Inicia sesión para continuar", "Sign in to continue")}</h1>
               <p className="text-sm text-muted-foreground">
                 {tv(
                   "login.subtitle",
@@ -292,7 +294,7 @@ export default function Login() {
                   />
 
                   <Input
-                    label={tv("login.password.label", "Contraseña (mín. 6)", "Password (min. 6)")}
+                    label={tv("login.password.label", "Contraseña (mín. 8)", "Password (min. 8)")}
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
