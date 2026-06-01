@@ -7,11 +7,11 @@
 [![Node.js](https://img.shields.io/badge/node.js-18+-339933.svg?style=flat-square)](https://nodejs.org/)
 [![Tests](https://img.shields.io/badge/tests-21/21%20passing-brightgreen.svg?style=flat-square)](#tests)
 
-**Trabajo Final de Master (TFM)** - Plataforma web moderna para la gestión integral de drones, incluyendo autenticación segura, CRUD de aeronaves, análisis de dumps de configuración y comunidad de usuarios.
+**Proyecto final de Desarrollo de Aplicaciones Web (DAW)** - Plataforma web moderna para la gestión integral de drones, incluyendo autenticación segura, CRUD de aeronaves, análisis de dumps de configuración y comunidad de usuarios.
 
 ---
 
-## 📋 Tabla de Contenidos
+## ?? Tabla de Contenidos
 
 - [Descripción](#-descripción)
 - [Características](#-características)
@@ -30,7 +30,7 @@
 
 ---
 
-## 📖 Descripción
+## ?? Descripción
 
 **DronHangar** es una plataforma web integral para la gestión de drones dirigida a pilotos, técnicos y organizaciones. Proporciona herramientas avanzadas para:
 
@@ -43,40 +43,40 @@ La aplicación está construida con un enfoque moderno utilizando tecnologías f
 
 ---
 
-## ✨ Características
+## ? Características
 
 ### Autenticación y Seguridad
-- ✅ Registro e inicio de sesión con validación de email
-- ✅ Tokens JWT con expiración configurable
-- ✅ Hashing de contraseñas con PBKDF2
-- ✅ Autorización basada en usuario para datos privados
+- ? Registro e inicio de sesión con validación de email
+- ? Tokens JWT con expiración configurable
+- ? Hashing de contraseñas con PBKDF2
+- ? Autorización basada en usuario para datos privados
 
 ### Gestión de Drones
-- ✅ CRUD completo de drones (crear, leer, actualizar, eliminar)
-- ✅ Información estructurada: marca, modelo, tipo, notas
-- ✅ Asociación automática de drones al usuario propietario
-- ✅ Validación en tiempo real de datos
+- ? CRUD completo de drones (crear, leer, actualizar, eliminar)
+- ? Información estructurada: marca, modelo, tipo, notas
+- ? Asociación automática de drones al usuario propietario
+- ? Validación en tiempo real de datos
 
 ### Gestión de Dumps
-- ✅ Subida segura de archivos de configuración (dumps)
-- ✅ Soporte para múltiples formatos: `.sql`, `.dump`, `.gz`, `.zip`, `.txt`
-- ✅ Análisis y parseo automático de dumps (formato Betaflight-like)
-- ✅ Límites de seguridad: 20 MB por archivo
-- ✅ Almacenamiento organizado por dron
+- ? Subida segura de archivos de configuración (dumps)
+- ? Soporte para múltiples formatos: `.sql`, `.dump`, `.gz`, `.zip`, `.txt`
+- ? Análisis y parseo automático de dumps (formato Betaflight-like)
+- ? Límites de seguridad: 20 MB por archivo
+- ? Almacenamiento organizado por dron
 
 ### Comunidad
-- ✅ Foro de discusión
-- ✅ Compartir posts sobre drones y configuraciones
-- ✅ Gestión de comentarios
+- ? Foro de discusión
+- ? Compartir posts sobre drones y configuraciones
+- ? Gestión de comentarios
 
 ### Experiencia de Usuario
-- ✅ Interfaz responsive con Tailwind CSS
-- ✅ Soporte multiidioma: Español e Inglés
-- ✅ Navegación intuitiva con React Router
+- ? Interfaz responsive con Tailwind CSS
+- ? Soporte multiidioma: Español e Inglés
+- ? Navegación intuitiva con React Router
 
 ---
 
-## 🛠️ Stack Tecnológico
+## ??? Stack Tecnológico
 
 ### Backend
 
@@ -108,31 +108,31 @@ La aplicación está construida con un enfoque moderno utilizando tecnologías f
 
 ---
 
-## 🏗️ Arquitectura
+## ??? Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Frontend (React + Vite)                 │
-│                   http://localhost:5173                      │
-└─────────────┬───────────────────────────────────────────────┘
-              │ HTTP/REST
-              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                Backend (FastAPI + SQLAlchemy)                │
-│                   http://localhost:8000                      │
-│  ┌─────────────────────────────────────────────────────────┐ │
-│  │  /auth         - Autenticación JWT                      │ │
-│  │  /drones       - CRUD de aeronaves                      │ │
-│  │  /dumps        - Gestión de configuraciones             │ │
-│  │  /community    - Foro y posts                           │ │
-│  └─────────────────────────────────────────────────────────┘ │
-└─────────────┬───────────────────────────────────────────────┘
-              │ TCP/3306
-              ↓
-┌─────────────────────────────────────────────────────────────┐
-│              Database (MySQL / MariaDB)                       │
-│                  tfm_drones schema                           │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+¦                      Frontend (React + Vite)                 ¦
+¦                   http://localhost:5173                      ¦
++-------------------------------------------------------------+
+              ¦ HTTP/REST
+              ?
++-------------------------------------------------------------+
+¦                Backend (FastAPI + SQLAlchemy)                ¦
+¦                   http://localhost:8000                      ¦
+¦  +---------------------------------------------------------+ ¦
+¦  ¦  /auth         - Autenticación JWT                      ¦ ¦
+¦  ¦  /drones       - CRUD de aeronaves                      ¦ ¦
+¦  ¦  /dumps        - Gestión de configuraciones             ¦ ¦
+¦  ¦  /community    - Foro y posts                           ¦ ¦
+¦  +---------------------------------------------------------+ ¦
++-------------------------------------------------------------+
+              ¦ TCP/3306
+              ?
++-------------------------------------------------------------+
+¦              Database (MySQL / MariaDB)                       ¦
+¦                  tfm_drones schema                           ¦
++-------------------------------------------------------------+
 ```
 
 ### Modelos de Datos
@@ -148,7 +148,7 @@ La aplicación está construida con un enfoque moderno utilizando tecnologías f
 **Drone**
 ```python
 - id: Integer (PK)
-- owner_email: String (FK → User.email)
+- owner_email: String (FK ? User.email)
 - brand: String
 - model: String
 - drone_type: String
@@ -159,7 +159,7 @@ La aplicación está construida con un enfoque moderno utilizando tecnologías f
 **DroneDump**
 ```python
 - id: Integer (PK)
-- drone_id: Integer (FK → Drone.id)
+- drone_id: Integer (FK ? Drone.id)
 - filename: String
 - file_path: String
 - size: Integer
@@ -178,68 +178,68 @@ La aplicación está construida con un enfoque moderno utilizando tecnologías f
 
 ---
 
-## 📁 Estructura del Proyecto
+## ?? Estructura del Proyecto
 
 ```
 tfm-drones/
-├── backend/                          # API REST FastAPI
-│   ├── main.py                       # Aplicación principal
-│   ├── auth.py                       # Lógica de autenticación
-│   ├── auth_routes.py                # Endpoints /auth
-│   ├── community_routes.py           # Endpoints /community
-│   ├── db.py                         # Configuración base de datos
-│   ├── models.py                     # Modelos SQLAlchemy (Drone, DroneDump)
-│   ├── user_models.py                # Modelo User
-│   ├── requirements.txt              # Dependencias Python
-│   ├── conftest.py                   # Configuración pytest
-│   ├── test_auth.py                  # Tests autenticación
-│   ├── test_db.py                    # Tests base de datos
-│   ├── test_models.py                # Tests modelos
-│   └── uploads/                      # Directorio para dumps subidos
-│
-├── frontend/                          # App React + Vite
-│   ├── src/
-│   │   ├── main.jsx                  # Punto de entrada
-│   │   ├── App.jsx                   # Componente raíz
-│   │   ├── api.js                    # Cliente HTTP (Axios)
-│   │   ├── auth.js                   # Lógica de autenticación
-│   │   ├── components/               # Componentes reutilizables
-│   │   │   ├── home/                 # Componentes página inicio
-│   │   │   └── ui/                   # Componentes UI (Button, Input, etc.)
-│   │   ├── pages/                    # Páginas principales
-│   │   │   ├── Home.jsx
-│   │   │   ├── Login.jsx
-│   │   │   ├── Manage.jsx            # Gestión de drones
-│   │   │   ├── DroneDetail.jsx
-│   │   │   ├── DumpParse.jsx
-│   │   │   └── CommunityForum.jsx
-│   │   ├── layouts/                  # Layouts
-│   │   ├── hooks/                    # Custom hooks
-│   │   ├── __tests__/                # Tests Vitest
-│   │   └── assets/                   # Imágenes y recursos
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── vitest.config.js
-│   ├── eslint.config.js
-│   ├── tailwind.config.js
-│   └── postcss.config.js
-│
-├── docs/                              # Documentación
-│   ├── ARQUITECTURA.md               # Diseño del sistema
-│   ├── BD.md                         # Esquema base de datos
-│   ├── EJECUCION_LOCAL.md            # Guía de instalación
-│   ├── postman/                      # Colección API Postman
-│   ├── samples/                      # Ejemplos de datos
-│   └── slides/                       # Presentación
-│
-├── LICENSE                            # Licencia MIT
-├── README.md                          # Este archivo
-└── package.json                       # Metadatos proyecto
++-- backend/                          # API REST FastAPI
+¦   +-- main.py                       # Aplicación principal
+¦   +-- auth.py                       # Lógica de autenticación
+¦   +-- auth_routes.py                # Endpoints /auth
+¦   +-- community_routes.py           # Endpoints /community
+¦   +-- db.py                         # Configuración base de datos
+¦   +-- models.py                     # Modelos SQLAlchemy (Drone, DroneDump)
+¦   +-- user_models.py                # Modelo User
+¦   +-- requirements.txt              # Dependencias Python
+¦   +-- conftest.py                   # Configuración pytest
+¦   +-- test_auth.py                  # Tests autenticación
+¦   +-- test_db.py                    # Tests base de datos
+¦   +-- test_models.py                # Tests modelos
+¦   +-- uploads/                      # Directorio para dumps subidos
+¦
++-- frontend/                          # App React + Vite
+¦   +-- src/
+¦   ¦   +-- main.jsx                  # Punto de entrada
+¦   ¦   +-- App.jsx                   # Componente raíz
+¦   ¦   +-- api.js                    # Cliente HTTP (Axios)
+¦   ¦   +-- auth.js                   # Lógica de autenticación
+¦   ¦   +-- components/               # Componentes reutilizables
+¦   ¦   ¦   +-- home/                 # Componentes página inicio
+¦   ¦   ¦   +-- ui/                   # Componentes UI (Button, Input, etc.)
+¦   ¦   +-- pages/                    # Páginas principales
+¦   ¦   ¦   +-- Home.jsx
+¦   ¦   ¦   +-- Login.jsx
+¦   ¦   ¦   +-- Manage.jsx            # Gestión de drones
+¦   ¦   ¦   +-- DroneDetail.jsx
+¦   ¦   ¦   +-- DumpParse.jsx
+¦   ¦   ¦   +-- CommunityForum.jsx
+¦   ¦   +-- layouts/                  # Layouts
+¦   ¦   +-- hooks/                    # Custom hooks
+¦   ¦   +-- __tests__/                # Tests Vitest
+¦   ¦   +-- assets/                   # Imágenes y recursos
+¦   +-- package.json
+¦   +-- vite.config.js
+¦   +-- vitest.config.js
+¦   +-- eslint.config.js
+¦   +-- tailwind.config.js
+¦   +-- postcss.config.js
+¦
++-- docs/                              # Documentación
+¦   +-- ARQUITECTURA.md               # Diseño del sistema
+¦   +-- BD.md                         # Esquema base de datos
+¦   +-- EJECUCION_LOCAL.md            # Guía de instalación
+¦   +-- postman/                      # Colección API Postman
+¦   +-- samples/                      # Ejemplos de datos
+¦   +-- slides/                       # Presentación
+¦
++-- LICENSE                            # Licencia MIT
++-- README.md                          # Este archivo
++-- package.json                       # Metadatos proyecto
 ```
 
 ---
 
-## 📋 Requisitos
+## ?? Requisitos
 
 ### Sistema
 - **Python:** 3.11 o superior
@@ -250,16 +250,16 @@ tfm-drones/
 ### Verificación
 ```bash
 # Verificar Python
-python --version  # ≥ 3.11.0
+python --version  # = 3.11.0
 
 # Verificar Node.js
-node --version    # ≥ 18.0.0
-npm --version     # ≥ 9.0.0
+node --version    # = 18.0.0
+npm --version     # = 9.0.0
 ```
 
 ---
 
-## 🔧 Instalación y Configuración
+## ?? Instalación y Configuración
 
 ### 1. Clonar el Repositorio
 
@@ -335,7 +335,7 @@ npm run build # Compilar para producción
 
 ---
 
-## 🚀 Ejecución
+## ?? Ejecución
 
 ### Opción 1: Ejecutar Backend y Frontend por Separado
 
@@ -371,12 +371,12 @@ El frontend estará disponible en: **http://localhost:5173**
 
 Si tienes configured las tareas, presiona `Ctrl+Shift+P` y escribe:
 ```
-Tasks: Run Task → "Dev: start frontend + backend"
+Tasks: Run Task ? "Dev: start frontend + backend"
 ```
 
 ---
 
-## 🔌 API Endpoints
+## ?? API Endpoints
 
 ### Autenticación `/auth`
 
@@ -401,11 +401,11 @@ curl -X POST "http://localhost:8000/auth/register" \
 
 | Método | Endpoint | Descripción | Auth |
 |--------|----------|-------------|------|
-| GET | `/drones` | Listar drones | ✅ |
-| GET | `/drones/{id}` | Obtener detalles | ✅ |
-| POST | `/drones` | Crear dron | ✅ |
-| PUT | `/drones/{id}` | Actualizar dron | ✅ |
-| DELETE | `/drones/{id}` | Eliminar dron | ✅ |
+| GET | `/drones` | Listar drones | ? |
+| GET | `/drones/{id}` | Obtener detalles | ? |
+| POST | `/drones` | Crear dron | ? |
+| PUT | `/drones/{id}` | Actualizar dron | ? |
+| DELETE | `/drones/{id}` | Eliminar dron | ? |
 
 **Ejemplo - Crear Dron:**
 
@@ -425,10 +425,10 @@ curl -X POST "http://localhost:8000/drones" \
 
 | Método | Endpoint | Descripción | Auth |
 |--------|----------|-------------|------|
-| GET | `/drones/{drone_id}/dumps` | Listar dumps | ✅ |
-| POST | `/dumps` | Subir dump | ✅ |
-| DELETE | `/drones/{drone_id}/dumps/{dump_id}` | Eliminar dump | ✅ |
-| GET | `/drones/{drone_id}/dumps/{dump_id}/parse` | Analizar dump | ✅ |
+| GET | `/drones/{drone_id}/dumps` | Listar dumps | ? |
+| POST | `/dumps` | Subir dump | ? |
+| DELETE | `/drones/{drone_id}/dumps/{dump_id}` | Eliminar dump | ? |
+| GET | `/drones/{drone_id}/dumps/{dump_id}/parse` | Analizar dump | ? |
 
 **Ejemplo - Subir Dump:**
 
@@ -443,15 +443,15 @@ curl -X POST "http://localhost:8000/dumps" \
 
 | Método | Endpoint | Descripción | Auth |
 |--------|----------|-------------|------|
-| GET | `/community/posts` | Listar posts | ❌ |
-| POST | `/community/posts` | Crear post | ✅ |
-| POST | `/community/posts/{id}/reply` | Responder | ✅ |
+| GET | `/community/posts` | Listar posts | ? |
+| POST | `/community/posts` | Crear post | ? |
+| POST | `/community/posts/{id}/reply` | Responder | ? |
 
 **Documentación Interactiva:** http://localhost:8000/docs (Swagger UI)
 
 ---
 
-## 🧪 Testing
+## ?? Testing
 
 ### Backend
 
@@ -478,17 +478,16 @@ npm run build
 
 ---
 
-## 📚 Documentación Adicional
+## ?? Documentación Adicional
 
 - [Arquitectura del Sistema](docs/ARQUITECTURA.md)
 - [Esquema de Base de Datos](docs/BD.md)
 - [Guía de Ejecución Local](docs/EJECUCION_LOCAL.md)
 - [Colección Postman](docs/postman/post.json)
-- [Presentación TFM](docs/slides/SLIDES.md)
 
 ---
 
-## 🤝 Contribuciones
+## ?? Contribuciones
 
 Las contribuciones son bienvenidas. Para cambios importantes:
 
@@ -506,30 +505,30 @@ Las contribuciones son bienvenidas. Para cambios importantes:
 
 ---
 
-## 📝 Requisitos Implementados
+## ?? Requisitos Implementados
 
-- ✅ Seguridad: Autenticación JWT + PBKDF2
-- ✅ Testing: 21/21 tests unitarios
-- ✅ Escalabilidad: Arquitectura modular
-- ✅ Mantenibilidad: Código refactorizado
-- ✅ Documentación: README, docstrings, API
-- ✅ Performance: Índices BD, límites upload
-- ✅ Accesibilidad: UI responsive, multiidioma
+- ? Seguridad: Autenticación JWT + PBKDF2
+- ? Testing: 21/21 tests unitarios
+- ? Escalabilidad: Arquitectura modular
+- ? Mantenibilidad: Código refactorizado
+- ? Documentación: README, docstrings, API
+- ? Performance: Índices BD, límites upload
+- ? Accesibilidad: UI responsive, multiidioma
 
 ---
 
-## 🔒 Licencia
+## ?? Licencia
 
 Licenciado bajo MIT License - Ver [LICENSE](LICENSE)
 
 ---
 
-## 👤 Autor
+## ?? Autor
 
 **Agustín Hernández**
 
-- 🍀 GitHub: [@AgustinHi](https://github.com/AgustinHi)
+- ?? GitHub: [@AgustinHi](https://github.com/AgustinHi)
 
 ---
 
-**Version:** 1.0.0 | **Status:** Production Ready ✅ | **Última actualización:** Febrero 2025
+**Version:** 1.0.0 | **Status:** Production Ready ? | **Última actualización:** Febrero 2025
