@@ -1,4 +1,4 @@
-# Logs
+﻿# Logs
 logs
 *.log
 npm-debug.log*
@@ -157,7 +157,6 @@ frontend/public/img1.jpeg
 frontend/public/img2.jpeg
 
 # Local security / reports
-snyk-status.txt
 
 # Local GitHub instructions (do not publish)
 .github/instructions/
