@@ -216,8 +216,6 @@ tfm-drones/
 ¦   ¦   +-- layouts/                  # Layouts
 ¦   ¦   +-- hooks/                    # Custom hooks
 ¦   ¦   +-- __tests__/                # Tests Vitest
-¦   ¦   +-- assets/                   # Imágenes y recursos
-¦   +-- package.json
 ¦   +-- vite.config.js
 ¦   +-- vitest.config.js
 ¦   +-- eslint.config.js
@@ -230,11 +228,9 @@ tfm-drones/
 ¦   +-- EJECUCION_LOCAL.md            # Guía de instalación
 ¦   +-- postman/                      # Colección API Postman
 ¦   +-- samples/                      # Ejemplos de datos
-¦   +-- slides/                       # Presentación
 ¦
 +-- LICENSE                            # Licencia MIT
 +-- README.md                          # Este archivo
-+-- package.json                       # Metadatos proyecto
 ```
 
 ---

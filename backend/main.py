@@ -1,4 +1,4 @@
-from pathlib import Path
+﻿from pathlib import Path
 from uuid import uuid4
 import io
 import gzip
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
-    title="TFM Drones API",
-    description="API segura para gestión de drones",
+    title="DronHangar API",
+    description="API segura para gestiÃ³n de drones",
     version="1.0.0"
 )
 
@@ -52,7 +52,7 @@ app.add_middleware(
     ]
 )
 
-# CORS más restrictivo
+# CORS mÃ¡s restrictivo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -62,7 +62,7 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # OPTIONS para preflight
-    allow_headers=["Content-Type", "Authorization"],  # explícito
+    allow_headers=["Content-Type", "Authorization"],  # explÃ­cito
     max_age=3600,  # Pre-flight cache 1 hora
 )
 
@@ -74,9 +74,9 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    # Política de seguridad estricta
+    # PolÃ­tica de seguridad estricta
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    # CSP básica
+    # CSP bÃ¡sica
     response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
     # Referrer Policy
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -95,7 +95,7 @@ DUMPS_DIR.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_DUMP_EXTS = {".sql", ".dump", ".gz", ".zip", ".txt"}
 
-# Límites defensivos (evita zip/gzip bombs y ficheros enormes)
+# LÃ­mites defensivos (evita zip/gzip bombs y ficheros enormes)
 MAX_DUMP_UPLOAD_BYTES = 20 * 1024 * 1024        # 20 MB (bytes escritos al disco)
 MAX_DUMP_DECOMPRESSED_BYTES = 20 * 1024 * 1024  # 20 MB (bytes tras descomprimir)
 
@@ -167,7 +167,7 @@ def _safe_remove_drone_dump_dir(drone_id: int) -> None:
     Borra la carpeta uploads/dumps/drone_{id} (si existe).
 
     Best-effort: si falla, no rompe el DELETE del dron
-    (evita dejar la API “bloqueada” por locks en Windows).
+    (evita dejar la API â€œbloqueadaâ€ por locks en Windows).
     """
     base = DUMPS_DIR.resolve()
     target = (DUMPS_DIR / f"drone_{drone_id}").resolve()
@@ -187,8 +187,8 @@ def _safe_remove_drone_dump_dir(drone_id: int) -> None:
 
 def _safe_remove_single_dump_file(drone_id: int, stored_path: str) -> None:
     """
-    Borra el fichero de un dump concreto, validando que el path está dentro de BASE_DIR.
-    Además, si el directorio drone_{id} queda vacío, lo elimina (best-effort).
+    Borra el fichero de un dump concreto, validando que el path estÃ¡ dentro de BASE_DIR.
+    AdemÃ¡s, si el directorio drone_{id} queda vacÃ­o, lo elimina (best-effort).
 
     Reglas:
     - Si el fichero NO existe: no falla (lo tratamos como ya borrado).
@@ -212,7 +212,7 @@ def _safe_remove_single_dump_file(drone_id: int, stored_path: str) -> None:
         except Exception:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not delete dump file")
 
-    # Best-effort: si la carpeta se queda vacía, la quitamos
+    # Best-effort: si la carpeta se queda vacÃ­a, la quitamos
     try:
         if expected_dir.exists() and expected_dir.is_dir():
             if not any(expected_dir.iterdir()):
@@ -250,7 +250,7 @@ def _decompress_gzip_limited(payload: bytes, limit: int) -> bytes:
 def _decompress_zip_limited(payload: bytes, limit: int) -> bytes:
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as zf:
-            # Sólo 1 fichero dentro (defensivo)
+            # SÃ³lo 1 fichero dentro (defensivo)
             names = [n for n in zf.namelist() if not n.endswith("/")]
             if not names:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty zip dump")
@@ -274,14 +274,14 @@ def _read_dump_payload_bytes(file_path: Path, ext: str) -> bytes:
     if ext == ".zip":
         return _decompress_zip_limited(payload, MAX_DUMP_DECOMPRESSED_BYTES)
 
-    # .sql/.dump/.txt → tal cual (pero limitado a MAX_DUMP_DECOMPRESSED_BYTES)
+    # .sql/.dump/.txt â†’ tal cual (pero limitado a MAX_DUMP_DECOMPRESSED_BYTES)
     if len(payload) > MAX_DUMP_DECOMPRESSED_BYTES:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Dump too large")
     return payload
 
 
 def _decode_dump_text(payload: bytes) -> str:
-    # Intenta UTF-8; si falla, latin-1 (mucha gente guarda así)
+    # Intenta UTF-8; si falla, latin-1 (mucha gente guarda asÃ­)
     try:
         return payload.decode("utf-8", errors="replace")
     except Exception:
@@ -290,8 +290,8 @@ def _decode_dump_text(payload: bytes) -> str:
 
 def parse_betaflight_like(text: str) -> dict:
     """
-    Parser “Betaflight-like” defensivo:
-    - detecta líneas típicas: '# version', '# resources', 'resource', 'set', 'profile', 'rateprofile', 'aux'
+    Parser â€œBetaflight-likeâ€ defensivo:
+    - detecta lÃ­neas tÃ­picas: '# version', '# resources', 'resource', 'set', 'profile', 'rateprofile', 'aux'
     - agrupa por secciones
     """
     lines = (text or "").splitlines()
@@ -369,7 +369,7 @@ def parse_betaflight_like(text: str) -> dict:
             recognized += 1
             continue
 
-        # Otros comandos típicos
+        # Otros comandos tÃ­picos
         if any(low.startswith(p) for p in ("feature ", "map ", "serial ", "rate ", "rxrange ", "vtxtable ", "smix ", "mmix ")):
             other_cmds.append(line)
             recognized += 1
@@ -484,7 +484,7 @@ def delete_drone(drone_id: int, user_email: str = Depends(get_current_user_email
     with Session(engine) as session:
         d = _get_owned_drone(session, drone_id, user_email)
 
-        # 1) borrar registros en BD (cascade debería borrar dumps)
+        # 1) borrar registros en BD (cascade deberÃ­a borrar dumps)
         session.delete(d)
         session.commit()
 
@@ -516,11 +516,11 @@ async def upload_dump(
         drone_dir = DUMPS_DIR / f"drone_{drone_id}"
         drone_dir.mkdir(parents=True, exist_ok=True)
 
-        # Nombre único
+        # Nombre Ãºnico
         stored_name = f"{uuid4().hex}_{safe_original}"
         dest_path = drone_dir / stored_name
 
-        # Guardar a disco con límite (MAX_DUMP_UPLOAD_BYTES)
+        # Guardar a disco con lÃ­mite (MAX_DUMP_UPLOAD_BYTES)
         size = 0
         try:
             with dest_path.open("wb") as out:
@@ -536,7 +536,7 @@ async def upload_dump(
                         )
                     out.write(chunk)
         except HTTPException:
-            # si sobrepasó, intenta borrar lo escrito
+            # si sobrepasÃ³, intenta borrar lo escrito
             try:
                 if dest_path.exists():
                     dest_path.unlink()

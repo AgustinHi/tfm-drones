@@ -1,4 +1,4 @@
-# backend/auth.py
+﻿# backend/auth.py
 import os
 from datetime import datetime, timedelta
 
@@ -12,7 +12,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-me")
 JWT_ALG = "HS256"
 JWT_EXPIRES_MIN = int(os.getenv("JWT_EXPIRES_MIN", "120"))
 
-# Usamos PBKDF2 (evita problemas de bcrypt en Windows y es suficiente para el TFM)
+# Usamos PBKDF2 (evita problemas de bcrypt en Windows y es suficiente para el proyecto)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
